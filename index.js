@@ -13589,8 +13589,8 @@ TreeBase.register(Display, "Display");
 let Option$1 = class Option extends TreeBase {
   name = new String$1("", { hiddenLabel: true }); // Hide label in settings
   value = new String$1("", { hiddenLabel: true }); // Hide label in settings
-  selectedColor = new Color("pink"); // Per-Option selected color
-  unselectedColor = new Color("lightgray"); // Per-Option unselected color
+  selectedColor = new Color("pink", { hiddenLabel: true }); // Hide label
+  unselectedColor = new Color("lightgray", { hiddenLabel: true }); // Hide label
   cache = {}; // Cache for performance or state management
 };
 TreeBase.register(Option$1, "Option");
@@ -13727,6 +13727,7 @@ class Radio extends TreeBase {
           ComponentName: radioLabel || primaryStateName,
           label: choiceName,
         }}
+        @click=${this.handleClick}
        >
         ${choiceName}
       </button>`;
@@ -13786,8 +13787,8 @@ class Radio extends TreeBase {
                 <td>${index + 1}</td>
                 <td>${option.name.input()}</td>
                 <td>${option.value.input()}</td>
-                <td>${option.selectedColor.input()}</td> <!-- Selected Color Input -->
-                <td>${option.unselectedColor.input()}</td> <!-- Unselected Color Input -->
+                <td>${option.selectedColor.input()}</td> <!-- No extra label -->
+                <td>${option.unselectedColor.input()}</td> <!-- No extra label -->
               </tr>
             `
           )}
@@ -13799,15 +13800,15 @@ class Radio extends TreeBase {
     const stateSettings = html`<fieldset>
       <legend>State Management</legend>
       <label>
-        Primary State Name:
+        
         ${this.primaryStateName.input()}
       </label>
       <label>
-        Secondary State Name:
+        
         ${this.secondaryStateName.input()}
       </label>
       <label>
-        Last Clicked State Name:
+        
         ${this.lastClickedStateName.input()}
       </label>
     </fieldset>`;
