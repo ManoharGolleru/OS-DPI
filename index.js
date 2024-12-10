@@ -4705,6 +4705,17 @@ if ("I".toLowerCase() !== "i") {
 	lowercase = manualLowercase;
 }
 
+// Run a function and disallow temporarly the use of the Function constructor
+// This makes arbitrary code generation attacks way more complicated.
+function runWithFunctionConstructorProtection(fn) {
+	var originalFunctionConstructor = Function.prototype.constructor;
+	delete Function.prototype.constructor;
+	var result = fn();
+	// eslint-disable-next-line no-extend-native
+	Function.prototype.constructor = originalFunctionConstructor;
+	return result;
+}
+
 var jqLite, // delay binding since jQuery could be loaded after us.
 	toString$1 = Object.prototype.toString,
 	getPrototypeOf = Object.getPrototypeOf,
@@ -6309,14 +6320,27 @@ ASTCompiler.prototype = {
 			extra +
 			this.watchFns() +
 			"return fn;";
+
 		// eslint-disable-next-line no-new-func
-		var fn = new Function(
+		var wrappedFn = new Function(
 			"$filter",
 			"getStringValue",
 			"ifDefined",
 			"plus",
 			fnString
 		)(this.$filter, getStringValue, ifDefined, plusFn);
+
+		var fn = function (s, l, a, i) {
+			return runWithFunctionConstructorProtection(function () {
+				return wrappedFn(s, l, a, i);
+			});
+		};
+		fn.assign = function (s, v, l) {
+			return runWithFunctionConstructorProtection(function () {
+				return wrappedFn.assign(s, v, l);
+			});
+		};
+		fn.inputs = wrappedFn.inputs;
 
 		this.state = this.stage = undefined;
 		fn.ast = ast;
@@ -6511,7 +6535,12 @@ ASTCompiler.prototype = {
 						);
 					},
 					intoId &&
-						self.lazyAssign(intoId, self.nonComputedMember("l", ast.name))
+						function () {
+							self.if_(
+								self.hasOwnProperty_("l", ast.name),
+								self.lazyAssign(intoId, self.nonComputedMember("l", ast.name))
+							);
+						}
 				);
 				recursionFn(intoId);
 				break;
@@ -6785,7 +6814,7 @@ ASTCompiler.prototype = {
 	},
 
 	filter: function (filterName) {
-		if (!this.state.filters.hasOwnProperty(filterName)) {
+		if (!hasOwnProperty.call(this.state.filters, filterName)) {
 			this.state.filters[filterName] = this.nextId(true);
 		}
 		return this.state.filters[filterName];
@@ -6877,7 +6906,7 @@ ASTCompiler.prototype = {
 			left +
 			"[" +
 			right +
-			"] : null)"
+			"] : undefined)"
 		);
 	},
 
@@ -6994,7 +7023,7 @@ ASTInterpreter.prototype = {
 		forEach(ast.body, function (expression) {
 			expressions.push(self.recurse(expression.expression));
 		});
-		var fn =
+		var wrappedFn =
 			ast.body.length === 0
 				? noop$1
 				: ast.body.length === 1
@@ -7008,10 +7037,22 @@ ASTInterpreter.prototype = {
 						};
 
 		if (assign) {
-			fn.assign = function (scope, value, locals) {
+			wrappedFn.assign = function (scope, value, locals) {
 				return assign(scope, locals, value);
 			};
 		}
+
+		var fn = function (scope, locals) {
+			return runWithFunctionConstructorProtection(function () {
+				return wrappedFn(scope, locals);
+			});
+		};
+		fn.assign = function (scope, value, locals) {
+			return runWithFunctionConstructorProtection(function () {
+				return wrappedFn.assign(scope, value, locals);
+			});
+		};
+
 		if (inputs) {
 			fn.inputs = inputs;
 		}
@@ -7339,7 +7380,10 @@ ASTInterpreter.prototype = {
 			if (create && create !== 1 && base && base[name] == null) {
 				base[name] = {};
 			}
-			var value = base ? base[name] : undefined;
+			var value;
+			if (base && hasOwnProperty.call(base, name)) {
+				value = base ? base[name] : undefined;
+			}
 			if (context) {
 				return { context: base, name: name, value: value };
 			}
@@ -41050,7 +41094,7 @@ async function ClearLog() {
  * Download the conversation history as a CSV file.
  */
 async function DownloadCSV() {
-  const serverUrl = "http://34.118.128.211:5678/download_csv"; // Adjust if necessary
+  const serverUrl = "http://34.136.166.29:5678/download_csv"; // Adjust if necessary
 
   try {
     const response = await fetch(serverUrl);
