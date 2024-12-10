@@ -42086,6 +42086,10 @@ class Actions extends DesignerPanel {
             ]),
           );
           Globals.state.update(patch);
+          // Trigger the DownloadCSV function if $triggerDownloadCSV state is updated
+          if (patch['$triggerDownloadCSV'] === true || patch['$triggerDownloadCSV'] === 1) {
+            DownloadCSV();
+          }
           break;
         }
       }
