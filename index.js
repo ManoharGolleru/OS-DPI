@@ -14312,12 +14312,19 @@ class Button extends TreeBase {
 }
 TreeBase.register(Button, "Button");
 
+// Monitor.js
+
+
 class Monitor extends TreeBase {
   template() {
     const { state, actions: rules } = Globals;
     const stateKeys = [
       ...new Set([...Object.keys(state.values), ...accessed.keys()]),
     ].sort();
+
+    // Debugging: Log stateKeys
+    console.log("Rendering Monitor - State Keys:", stateKeys);
+
     const s = html`<table class="state">
       <thead>
         <tr>
@@ -14335,9 +14342,16 @@ class Monitor extends TreeBase {
             if (value.length > clamped.length) {
               clamped += "...";
             }
+
+            // Ensure clamped is always a string
+            clamped = String(clamped);
+
+            // Debugging: Log each state row
+            console.log(`State Key: ${key}, Value: ${clamped}`);
+
             return html`<tr
-              ?updated=${state.hasBeenUpdated(key)}
-              ?undefined=${accessed.get(key) === false}
+              ?updated=${Boolean(state.hasBeenUpdated(key))}
+              ?undefined=${Boolean(accessed.get(key) === false)}
             >
               <td>${key}</td>
               <td>${clamped}</td>
@@ -14353,6 +14367,10 @@ class Monitor extends TreeBase {
     const rowKeys = [
       ...new Set([...Object.keys(row), ...rowAccessedKeys]),
     ].sort();
+
+    // Debugging: Log rowKeys
+    console.log("Rendering Monitor - Row Keys:", rowKeys);
+
     const f = html`<table class="fields">
       <thead>
         <tr>
@@ -14363,12 +14381,17 @@ class Monitor extends TreeBase {
       <tbody>
         ${rowKeys.map((key) => {
           const value = row[key];
+          const displayValue = typeof value === "string" ? value : String(value || "");
+
+          // Debugging: Log each field row
+          console.log(`Field Key: ${key}, Value: ${displayValue}`);
+
           return html`<tr
-            ?undefined=${accessed.get(`_${key}`) === false}
-            ?accessed=${accessed.has(`_${key}`)}
+            ?undefined=${Boolean(accessed.get(`_${key}`) === false)}
+            ?accessed=${Boolean(accessed.has(`_${key}`))}
           >
             <td>#${key}</td>
-            <td>${value || ""}</td>
+            <td>${displayValue}</td>
           </tr>`;
         })}
       </tbody>
