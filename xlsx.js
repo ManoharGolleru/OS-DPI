@@ -2499,7 +2499,7 @@ if(!use_typed_arrays) {
 				var match = -1, mlen = 0;
 
 				if((match = addrs[hash])) {
-					match |= boff & ~0x7FFF;
+					match |= boff & -32768;
 					if(match > boff) match -= 0x8000;
 					if(match < boff) while(data[match + mlen] == data[boff + mlen] && mlen < 250) ++mlen;
 				}
@@ -3855,9 +3855,7 @@ var XMLNS = ({
 	'dc': 'http://purl.org/dc/elements/1.1/',
 	'dcterms': 'http://purl.org/dc/terms/',
 	'dcmitype': 'http://purl.org/dc/dcmitype/',
-	'mx': 'http://schemas.microsoft.com/office/mac/excel/2008/main',
 	'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
-	'sjs': 'http://schemas.openxmlformats.org/package/2006/sheetjs/core-properties',
 	'vt': 'http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes',
 	'xsi': 'http://www.w3.org/2001/XMLSchema-instance',
 	'xsd': 'http://www.w3.org/2001/XMLSchema'
@@ -4511,7 +4509,7 @@ function write_BrtCommentText(str/*:XLString*/, o/*:?Block*/)/*:Block*/ {
 	o.write_shift(1, 1);
 	write_XLWideString(str.t, o);
 	o.write_shift(4, 1);
-	write_StrRun({ ich: 0, ifnt: 0 }, o);
+	write_StrRun({ }, o);
 	return _null ? o.slice(0, o.l) : o;
 }
 
@@ -4581,8 +4579,8 @@ function parse_RkNumber(data)/*:number*/ {
 function write_RkNumber(data/*:number*/, o) {
 	if (o == null) o = new_buf(4);
 	var fX100 = 0, fInt = 0, d100 = data * 100;
-	if ((data == (data | 0)) && (data >= -(1 << 29)) && (data < (1 << 29))) { fInt = 1; }
-	else if ((d100 == (d100 | 0)) && (d100 >= -(1 << 29)) && (d100 < (1 << 29))) { fInt = 1; fX100 = 1; }
+	if ((data == (data | 0)) && (data >= -536870912) && (data < (1 << 29))) { fInt = 1; }
+	else if ((d100 == (d100 | 0)) && (d100 >= -536870912) && (d100 < (1 << 29))) { fInt = 1; fX100 = 1; }
 	if (fInt) o.write_shift(-4, ((fX100 ? d100 : data) << 2) + (fX100 + 2));
 	else throw new Error("unsupported RkNumber " + data); // TODO
 }
@@ -5406,14 +5404,10 @@ function write_ct(ct, opts, raw)/*:string*/ {
 /* 9.3 Relationships */
 var RELS = ({
 	WB: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
-	SHEET: "http://sheetjs.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
 	HLINK: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
 	VML: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
 	XPATH: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLinkPath",
 	XMISS: "http://schemas.microsoft.com/office/2006/relationships/xlExternalLinkPath/xlPathMissing",
-	XLINK: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink",
-	CXML: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
-	CXMLP: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps",
 	CMNT: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
 	CORE_PROPS: "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties",
 	EXT_PROPS: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties',
@@ -5421,8 +5415,6 @@ var RELS = ({
 	SST: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings",
 	STY: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
 	THEME: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
-	CHART: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
-	CHARTEX: "http://schemas.microsoft.com/office/2014/relationships/chartEx",
 	CS: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
 	WS: [
 		"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
@@ -5430,12 +5422,10 @@ var RELS = ({
 	],
 	DS: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
 	MS: "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
-	IMG: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
 	DRAW: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
 	XLMETA: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata",
 	TCMNT: "http://schemas.microsoft.com/office/2017/10/relationships/threadedComment",
 	PEOPLE: "http://schemas.microsoft.com/office/2017/10/relationships/person",
-	CONN: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections",
 	VBA: "http://schemas.microsoft.com/office/2006/relationships/vbaProject"
 }/*:any*/);
 
@@ -6502,7 +6492,7 @@ function write_Hyperlink(hl) {
 	if(Target.slice(0,7) == "file://") Target = Target.slice(7);
 	var hashidx = Target.indexOf("#");
 	var F = hashidx > -1 ? 0x1f : 0x17;
-	switch(Target.charAt(0)) { case "#": F=0x1c; break; case ".": F&=~2; break; }
+	switch(Target.charAt(0)) { case "#": F=0x1c; break; case ".": F&=-3; break; }
 	out.write_shift(4,2); out.write_shift(4, F);
 	var data = [8,6815827,6619237,4849780,83]; for(i = 0; i < data.length; ++i) out.write_shift(4, data[i]);
 	if(F == 0x1C) {
@@ -6937,7 +6927,7 @@ function write_Font(data, opts) {
 	var name = data.name || "Arial";
 	var b5 = (opts && (opts.biff == 5)), w = (b5 ? (15 + name.length) : (16 + 2 * name.length));
 	var o = new_buf(w);
-	o.write_shift(2, (data.sz || 12) * 20);
+	o.write_shift(2, (data.sz) * 20);
 	o.write_shift(4, 0);
 	o.write_shift(2, 400);
 	o.write_shift(4, 0);
@@ -9083,7 +9073,7 @@ var WK_ = /*#__PURE__*/(function() {
 
 	function wk1_parse_rc(B, V, col) {
 		var rel = V & 0x8000;
-		V &= ~0x8000;
+		V &= -32769;
 		V = (rel ? B : 0) + ((V >= 0x2000) ? V - 0x4000 : V);
 		return (rel ? "" : "$") + (col ? encode_col(V) : encode_row(V));
 	}
@@ -11070,8 +11060,7 @@ function write_BrtFont(font/*:any*/, o) {
 	o.write_shift(1, 0);
 	write_BrtColor(font.color, o);
 	var scheme = 0;
-	if(font.scheme == "major") scheme = 1;
-	if(font.scheme == "minor") scheme = 2;
+	scheme = 2;
 	o.write_shift(1, scheme);
 	write_XLWideString(font.name, o);
 	return o.length > o.l ? o.slice(0, o.l) : o;
@@ -11184,7 +11173,7 @@ function write_BrtStyle(style, o) {
 	if(!o) o = new_buf(12+4*10);
 	o.write_shift(4, style.xfId);
 	o.write_shift(2, 1);
-	o.write_shift(1, +style.builtinId);
+	o.write_shift(1, 0);
 	o.write_shift(1, 0); /* iLevel */
 	write_XLNullableWideString(style.name || "", o);
 	return o.length > o.l ? o.slice(0, o.l) : o;
@@ -11286,9 +11275,7 @@ function write_FONTS_bin(ba/*::, data*/) {
 		sz:12,
 		color: {theme:1},
 		name: "Calibri",
-		family: 2,
-		scheme: "minor"
-	}));
+		family: 2}));
 	/* 1*65491BrtFont [ACFONTS] */
 	write_record(ba, 0x0264 /* BrtEndFonts */);
 }
@@ -11314,11 +11301,7 @@ function write_CELLSTYLEXFS_bin(ba/*::, data*/) {
 	var cnt = 1;
 	write_record(ba, 0x0272 /* BrtBeginCellStyleXFs */, write_UInt32LE(cnt));
 	write_record(ba, 0x002F /* BrtXF */, write_BrtXF({
-		numFmtId: 0,
-		fontId:   0,
-		fillId:   0,
-		borderId: 0
-	}, 0xFFFF));
+		numFmtId: 0}, 0xFFFF));
 	/* 1*65430(BrtXF *FRT) */
 	write_record(ba, 0x0273 /* BrtEndCellStyleXFs */);
 }
@@ -11336,7 +11319,6 @@ function write_STYLES_bin(ba/*::, data*/) {
 	write_record(ba, 0x026B /* BrtBeginStyles */, write_UInt32LE(cnt));
 	write_record(ba, 0x0030 /* BrtStyle */, write_BrtStyle({
 		xfId:0,
-		builtinId:0,
 		name:"Normal"
 	}));
 	/* 1*65430(BrtStyle *FRT) */
@@ -11917,7 +11899,7 @@ function parse_xlmeta_xml(data, name, opts) {
         lastmeta.offsets.push(+y.i);
         break;
       default:
-        if (!pass && (opts == null ? void 0 : opts.WTF))
+        if (!pass && (opts == null ? undefined : opts.WTF))
           throw new Error("unrecognized " + y[0] + " in metadata");
     }
     return x;
@@ -13249,7 +13231,7 @@ function get_ixti(supbooks, ixti/*:number*/, opts)/*:string*/ {
 }
 function stringify_formula(formula/*Array<any>*/, range, cell/*:any*/, supbooks, opts)/*:string*/ {
 	var biff = (opts && opts.biff) || 8;
-	var _range = /*range != null ? range :*/ {s:{c:0, r:0},e:{c:0, r:0}};
+	var _range = /*range != null ? range :*/ {s:{c:0, r:0}};
 	var stack/*:Array<string>*/ = [], e1, e2, /*::type,*/ c/*:CellAddress*/, ixti=0, nameidx=0, r, sname="";
 	if(!formula[0] || !formula[0][0]) return "";
 	var last_sp = -1, sp = "";
@@ -15825,7 +15807,7 @@ function write_ws_xml(idx/*:number*/, opts, wb/*:Workbook*/, rels)/*:string*/ {
 	/* customProperties */
 	/* cellWatches */
 
-	if(!opts || opts.ignoreEC || (opts.ignoreEC == (void 0))) o[o.length] = writetag("ignoredErrors", writextag("ignoredError", null, {numberStoredAsText:1, sqref:ref}));
+	if(!opts || opts.ignoreEC || (opts.ignoreEC == (undefined))) o[o.length] = writetag("ignoredErrors", writextag("ignoredError", null, {numberStoredAsText:1, sqref:ref}));
 
 	/* smartTags */
 
@@ -15946,8 +15928,8 @@ function write_BrtWsProp(str, outl, o) {
 	if(o == null) o = new_buf(84+4*str.length);
 	var f = 0xC0;
 	if(outl) {
-		if(outl.above) f &= ~0x40;
-		if(outl.left)  f &= ~0x80;
+		if(outl.above) f &= -65;
+		if(outl.left)  f &= -129;
 	}
 	o.write_shift(1, f);
 	for(var i = 1; i < 3; ++i) o.write_shift(1,0);
@@ -16461,14 +16443,14 @@ function parse_ws_bin(data, _opts, idx, rels, wb/*:WBWBProps*/, themes, styles)/
 				}
 				if(cm) {
 					if(cm.type == 'XLDAPR') p.D = true;
-					cm = void 0;
+					cm = undefined;
 				}
 				break;
 
 			case 0x0001: /* 'BrtCellBlank' */
 			case 0x000C: /* 'BrtShortBlank' */
 				if(!opts.sheetStubs || pass) break;
-				p = ({t:'z',v:void 0}/*:any*/);
+				p = ({t:'z',v:undefined}/*:any*/);
 				C = val[0].c == -1 ? C + 1 : val[0].c;
 				if(opts.dense) { if(!s["!data"][R]) s["!data"][R] = []; s["!data"][R][C] = p; }
 				else s[encode_col(C) + rr] = p;
@@ -16478,7 +16460,7 @@ function parse_ws_bin(data, _opts, idx, rels, wb/*:WBWBProps*/, themes, styles)/
 				if(refguess.e.c < C) refguess.e.c = C;
 				if(cm) {
 					if(cm.type == 'XLDAPR') p.D = true;
-					cm = void 0;
+					cm = undefined;
 				}
 				break;
 
@@ -16688,7 +16670,7 @@ function write_ws_bin_cell(ba/*:BufArray*/, cell/*:Cell*/, R/*:number*/, C/*:num
 			return true;
 		case 'n':
 			/* TODO: determine threshold for Real vs RK */
-			if(cell.v == (cell.v | 0) && cell.v > -1000 && cell.v < 1000) {
+			if(cell.v == (cell.v | 0) && cell.v > -1e3 && cell.v < 1000) {
 				if(last_seen) write_record(ba, 0x000D /* BrtShortRk */, write_BrtShortRk(cell, o));
 				else write_record(ba, 0x0002 /* BrtCellRk */, write_BrtCellRk(cell, o));
 			} else {
@@ -16862,7 +16844,7 @@ function write_ws_bin(idx/*:number*/, opts, wb/*:Workbook*/, rels) {
 	/* [COLBRK] */
 	/* *BrtBigName */
 	/* [CELLWATCHES] */
-	if(!opts || opts.ignoreEC || (opts.ignoreEC == (void 0))) write_IGNOREECS(ba, ws);
+	if(!opts || opts.ignoreEC || (opts.ignoreEC == (undefined))) write_IGNOREECS(ba, ws);
 	/* [SMARTTAGS] */
 	/* [BrtDrawing] */
 	write_LEGACYDRAWING(ba, ws, idx, rels);
@@ -18079,7 +18061,7 @@ function parse_xlml_xml(d, _opts)/*:Workbook*/ {
 		case 'cell' /*case 'Cell'*/:
 			if(Rn[1]==='/'){
 				if(comments.length > 0) cell.c = comments;
-				if((!opts.sheetRows || opts.sheetRows > r) && cell.v !== void 0) {
+				if((!opts.sheetRows || opts.sheetRows > r) && cell.v !== undefined) {
 					if(opts.dense) {
 						if(!cursheet["!data"][r]) cursheet["!data"][r] = [];
 						cursheet["!data"][r][c] = cell;
@@ -21265,11 +21247,7 @@ function write_biff2_buf(wb/*:Workbook*/, opts/*:WriteOpts*/) {
 function write_FONTS_biff8(ba, data, opts) {
 	write_biff_rec(ba, 0x0031 /* Font */, write_Font({
 		sz:12,
-		color: {theme:1},
-		name: "Arial",
-		family: 2,
-		scheme: "minor"
-	}, opts));
+		name: "Arial"}, opts));
 }
 
 
@@ -23282,7 +23260,7 @@ function write_shallow(proto) {
   return u8concat(out);
 }
 function mappa(data, cb) {
-  return (data == null ? void 0 : data.map(function(d) {
+  return (data == null ? undefined : data.map(function(d) {
     return cb(d.data);
   })) || [];
 }
@@ -23306,7 +23284,7 @@ function parse_iwa_file(buf) {
       });
       ptr.l += fl;
     });
-    if ((_a = ai[3]) == null ? void 0 : _a[0])
+    if ((_a = ai[3]) == null ? undefined : _a[0])
       res.merge = varint_to_i32(ai[3][0].data) >>> 0 > 0;
     out.push(res);
   }
@@ -23483,12 +23461,12 @@ function numbers_format_cell(cell, t, flags, ofmt, nfmt) {
   var fmt = ver >= 5 ? nfmt : ofmt;
   dur:
     if (flags & (ver > 4 ? 8 : 4) && cell.t == "n" && ctype == 7) {
-      var dstyle = ((_a = fmt[7]) == null ? void 0 : _a[0]) ? varint_to_i32(fmt[7][0].data) : -1;
+      var dstyle = ((_a = fmt[7]) == null ? undefined : _a[0]) ? varint_to_i32(fmt[7][0].data) : -1;
       if (dstyle == -1)
         break dur;
-      var dmin = ((_b = fmt[15]) == null ? void 0 : _b[0]) ? varint_to_i32(fmt[15][0].data) : -1;
-      var dmax = ((_c = fmt[16]) == null ? void 0 : _c[0]) ? varint_to_i32(fmt[16][0].data) : -1;
-      var auto = ((_d = fmt[40]) == null ? void 0 : _d[0]) ? varint_to_i32(fmt[40][0].data) : -1;
+      var dmin = ((_b = fmt[15]) == null ? undefined : _b[0]) ? varint_to_i32(fmt[15][0].data) : -1;
+      var dmax = ((_c = fmt[16]) == null ? undefined : _c[0]) ? varint_to_i32(fmt[16][0].data) : -1;
+      var auto = ((_d = fmt[40]) == null ? undefined : _d[0]) ? varint_to_i32(fmt[40][0].data) : -1;
       var d = cell.v, dd = d;
       autodur:
         if (auto) {
@@ -23630,7 +23608,7 @@ function parse_old_storage(buf, lut, v) {
   var t = buf[v >= 4 ? 1 : 2];
   switch (t) {
     case 0:
-      return void 0;
+      return undefined;
     case 2:
       ret = { t: "n", v: ieee };
       break;
@@ -23696,7 +23674,7 @@ function parse_new_storage(buf, lut) {
   var t = buf[1];
   switch (t) {
     case 0:
-      return void 0;
+      return undefined;
     case 2:
       ret = { t: "n", v: d128 };
       break;
@@ -23826,7 +23804,7 @@ function write_TSP_Reference(idx) {
 }
 function numbers_add_oref(iwa, ref) {
   var _a;
-  var orefs = ((_a = iwa.messages[0].meta[5]) == null ? void 0 : _a[0]) ? parse_packed_varints(iwa.messages[0].meta[5][0].data) : [];
+  var orefs = ((_a = iwa.messages[0].meta[5]) == null ? undefined : _a[0]) ? parse_packed_varints(iwa.messages[0].meta[5][0].data) : [];
   var orefidx = orefs.indexOf(ref);
   if (orefidx == -1) {
     orefs.push(ref);
@@ -23835,7 +23813,7 @@ function numbers_add_oref(iwa, ref) {
 }
 function numbers_del_oref(iwa, ref) {
   var _a;
-  var orefs = ((_a = iwa.messages[0].meta[5]) == null ? void 0 : _a[0]) ? parse_packed_varints(iwa.messages[0].meta[5][0].data) : [];
+  var orefs = ((_a = iwa.messages[0].meta[5]) == null ? undefined : _a[0]) ? parse_packed_varints(iwa.messages[0].meta[5][0].data) : [];
   iwa.messages[0].meta[5] = [{ type: 2, data: write_packed_varints(orefs.filter(function(r) {
     return r != ref;
   })) }];
@@ -23882,14 +23860,14 @@ function parse_TST_TileRowInfo(u8, type) {
   var pb = parse_shallow(u8);
   var R = varint_to_i32(pb[1][0].data) >>> 0;
   var cnt = varint_to_i32(pb[2][0].data) >>> 0;
-  var wide_offsets = ((_b = (_a = pb[8]) == null ? void 0 : _a[0]) == null ? void 0 : _b.data) && varint_to_i32(pb[8][0].data) > 0 || false;
+  var wide_offsets = ((_b = (_a = pb[8]) == null ? undefined : _a[0]) == null ? undefined : _b.data) && varint_to_i32(pb[8][0].data) > 0 || false;
   var used_storage_u8, used_storage;
-  if (((_d = (_c = pb[7]) == null ? void 0 : _c[0]) == null ? void 0 : _d.data) && type != 0) {
-    used_storage_u8 = (_f = (_e = pb[7]) == null ? void 0 : _e[0]) == null ? void 0 : _f.data;
-    used_storage = (_h = (_g = pb[6]) == null ? void 0 : _g[0]) == null ? void 0 : _h.data;
-  } else if (((_j = (_i = pb[4]) == null ? void 0 : _i[0]) == null ? void 0 : _j.data) && type != 1) {
-    used_storage_u8 = (_l = (_k = pb[4]) == null ? void 0 : _k[0]) == null ? void 0 : _l.data;
-    used_storage = (_n = (_m = pb[3]) == null ? void 0 : _m[0]) == null ? void 0 : _n.data;
+  if (((_d = (_c = pb[7]) == null ? undefined : _c[0]) == null ? undefined : _d.data) && type != 0) {
+    used_storage_u8 = (_f = (_e = pb[7]) == null ? undefined : _e[0]) == null ? undefined : _f.data;
+    used_storage = (_h = (_g = pb[6]) == null ? undefined : _g[0]) == null ? undefined : _h.data;
+  } else if (((_j = (_i = pb[4]) == null ? undefined : _i[0]) == null ? undefined : _j.data) && type != 1) {
+    used_storage_u8 = (_l = (_k = pb[4]) == null ? undefined : _k[0]) == null ? undefined : _l.data;
+    used_storage = (_n = (_m = pb[3]) == null ? undefined : _m[0]) == null ? undefined : _n.data;
   } else
     throw "NUMBERS Tile missing ".concat(type, " cell storage");
   var width = wide_offsets ? 4 : 1;
@@ -23913,7 +23891,7 @@ function parse_TST_Tile(M, root) {
   var _a;
   var pb = parse_shallow(root.data);
   var storage = -1;
-  if ((_a = pb == null ? void 0 : pb[7]) == null ? void 0 : _a[0]) {
+  if ((_a = pb == null ? undefined : pb[7]) == null ? undefined : _a[0]) {
     if (varint_to_i32(pb[7][0].data) >>> 0)
       storage = 1;
     else
@@ -23950,13 +23928,13 @@ function parse_TST_TableModelArchive(M, root, ws) {
   var dense = ws["!data"] != null, dws = ws;
   var store = parse_shallow(pb[4][0].data);
   var lut = numbers_lut_new();
-  if ((_a = store[4]) == null ? void 0 : _a[0])
+  if ((_a = store[4]) == null ? undefined : _a[0])
     lut.sst = parse_TST_TableDataList(M, M[parse_TSP_Reference(store[4][0].data)][0]);
-  if ((_b = store[11]) == null ? void 0 : _b[0])
+  if ((_b = store[11]) == null ? undefined : _b[0])
     lut.ofmt = parse_TST_TableDataList(M, M[parse_TSP_Reference(store[11][0].data)][0]);
-  if ((_c = store[17]) == null ? void 0 : _c[0])
+  if ((_c = store[17]) == null ? undefined : _c[0])
     lut.rsst = parse_TST_TableDataList(M, M[parse_TSP_Reference(store[17][0].data)][0]);
-  if ((_d = store[22]) == null ? void 0 : _d[0])
+  if ((_d = store[22]) == null ? undefined : _d[0])
     lut.nfmt = parse_TST_TableDataList(M, M[parse_TSP_Reference(store[22][0].data)][0]);
   var tile = parse_shallow(store[3][0].data);
   var _R = 0;
@@ -23983,12 +23961,12 @@ function parse_TST_TableModelArchive(M, root, ws) {
     });
     _R += _tile.nrows;
   });
-  if ((_e = store[13]) == null ? void 0 : _e[0]) {
+  if ((_e = store[13]) == null ? undefined : _e[0]) {
     var ref = M[parse_TSP_Reference(store[13][0].data)][0];
     var mtype = varint_to_i32(ref.meta[1][0].data);
     if (mtype != 6144)
       throw new Error("Expected merge type 6144, found ".concat(mtype));
-    ws["!merges"] = (_f = parse_shallow(ref.data)) == null ? void 0 : _f[1].map(function(pi) {
+    ws["!merges"] = (_f = parse_shallow(ref.data)) == null ? undefined : _f[1].map(function(pi) {
       var merge = parse_shallow(pi.data);
       var origin = u8_to_dataview(parse_shallow(merge[1][0].data)[1][0].data), size = u8_to_dataview(parse_shallow(merge[2][0].data)[1][0].data);
       return {
@@ -24004,7 +23982,7 @@ function parse_TST_TableModelArchive(M, root, ws) {
 function parse_TST_TableInfoArchive(M, root, opts) {
   var pb = parse_shallow(root.data);
   var out = { "!ref": "A1" };
-  if (opts == null ? void 0 : opts.dense)
+  if (opts == null ? undefined : opts.dense)
     out["!data"] = [];
   var tableref = M[parse_TSP_Reference(pb[2][0].data)];
   var mtype = varint_to_i32(tableref[0].meta[1][0].data);
@@ -24017,7 +23995,7 @@ function parse_TN_SheetArchive(M, root, opts) {
   var _a;
   var pb = parse_shallow(root.data);
   var out = {
-    name: ((_a = pb[1]) == null ? void 0 : _a[0]) ? u8str(pb[1][0].data) : "",
+    name: ((_a = pb[1]) == null ? undefined : _a[0]) ? u8str(pb[1][0].data) : "",
     sheets: []
   };
   var shapeoffs = mappa(pb[2], parse_TSP_Reference);
@@ -24034,7 +24012,7 @@ function parse_TN_DocumentArchive(M, root, opts) {
   var _a;
   var out = book_new();
   var pb = parse_shallow(root.data);
-  if ((_a = pb[2]) == null ? void 0 : _a[0])
+  if ((_a = pb[2]) == null ? undefined : _a[0])
     throw new Error("Keynote presentations are not supported");
   var sheetoffs = mappa(pb[1], parse_TSP_Reference);
   sheetoffs.forEach(function(off) {
@@ -24084,9 +24062,9 @@ function parse_numbers_iwa(cfb, opts) {
   });
   if (!indices.length)
     throw new Error("File has no messages");
-  if (((_c = (_b = (_a = M == null ? void 0 : M[1]) == null ? void 0 : _a[0].meta) == null ? void 0 : _b[1]) == null ? void 0 : _c[0].data) && varint_to_i32(M[1][0].meta[1][0].data) == 1e4)
+  if (((_c = (_b = (_a = M == null ? undefined : M[1]) == null ? undefined : _a[0].meta) == null ? undefined : _b[1]) == null ? undefined : _c[0].data) && varint_to_i32(M[1][0].meta[1][0].data) == 1e4)
     throw new Error("Pages documents are not supported");
-  var docroot = ((_g = (_f = (_e = (_d = M == null ? void 0 : M[1]) == null ? void 0 : _d[0]) == null ? void 0 : _e.meta) == null ? void 0 : _f[1]) == null ? void 0 : _g[0].data) && varint_to_i32(M[1][0].meta[1][0].data) == 1 && M[1][0];
+  var docroot = ((_g = (_f = (_e = (_d = M == null ? undefined : M[1]) == null ? undefined : _d[0]) == null ? undefined : _e.meta) == null ? undefined : _f[1]) == null ? undefined : _g[0].data) && varint_to_i32(M[1][0].meta[1][0].data) == 1 && M[1][0];
   if (!docroot)
     indices.forEach(function(idx) {
       M[idx].forEach(function(iwam) {
@@ -24120,7 +24098,7 @@ function write_TST_TileRowInfo(data, SST, wide) {
     })) }],
     [{ type: 0, data: write_varint49(1) }]
   ];
-  if (!((_a = tri[6]) == null ? void 0 : _a[0]) || !((_b = tri[7]) == null ? void 0 : _b[0]))
+  if (!((_a = tri[6]) == null ? undefined : _a[0]) || !((_b = tri[7]) == null ? undefined : _b[0]))
     throw "Mutation only works on post-BNC storages!";
   var cnt = 0;
   if (tri[7][0].data.length < 2 * data.length) {
@@ -24330,9 +24308,9 @@ function numbers_add_ws(cfb, deps, wsidx) {
         var parentidx = mlist[3].findIndex(function(m) {
           var _a, _b;
           var mm = parse_shallow(m.data);
-          if ((_a = mm[3]) == null ? void 0 : _a[0])
+          if ((_a = mm[3]) == null ? undefined : _a[0])
             return u8str(mm[3][0].data) == loc2;
-          if (((_b = mm[2]) == null ? void 0 : _b[0]) && u8str(mm[2][0].data) == loc2)
+          if (((_b = mm[2]) == null ? undefined : _b[0]) && u8str(mm[2][0].data) == loc2)
             return true;
           return false;
         });
@@ -24399,7 +24377,7 @@ function numbers_add_ws(cfb, deps, wsidx) {
     }
     if (tma[70]) {
       var hsoa = parse_shallow(tma[70][0].data);
-      (_a = hsoa[2]) == null ? void 0 : _a.forEach(function(item) {
+      (_a = hsoa[2]) == null ? undefined : _a.forEach(function(item) {
         var hsa = parse_shallow(item.data);
         [2, 3].map(function(n) {
           return hsa[n][0];
@@ -24448,7 +24426,7 @@ function numbers_add_ws(cfb, deps, wsidx) {
     {
       [2, 4, 5, 6, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22].forEach(function(n) {
         var _a2;
-        if (!((_a2 = store[n]) == null ? void 0 : _a2[0]))
+        if (!((_a2 = store[n]) == null ? undefined : _a2[0]))
           return;
         var oldref = parse_TSP_Reference(store[n][0].data);
         var newref = get_unique_msgid({ deps: [tmaref], location: deps[oldref].location, type: deps[oldref].type }, deps);
@@ -24488,9 +24466,9 @@ function numbers_add_ws(cfb, deps, wsidx) {
             var parentidx = mlist[3].findIndex(function(m) {
               var _a3, _b2;
               var mm = parse_shallow(m.data);
-              if ((_a3 = mm[3]) == null ? void 0 : _a3[0])
+              if ((_a3 = mm[3]) == null ? undefined : _a3[0])
                 return u8str(mm[3][0].data) == loc;
-              if (((_b2 = mm[2]) == null ? void 0 : _b2[0]) && u8str(mm[2][0].data) == loc)
+              if (((_b2 = mm[2]) == null ? undefined : _b2[0]) && u8str(mm[2][0].data) == loc)
                 return true;
               return false;
             });
@@ -24512,7 +24490,7 @@ function numbers_add_ws(cfb, deps, wsidx) {
       });
       var row_headers = parse_shallow(store[1][0].data);
       {
-        (_b = row_headers[2]) == null ? void 0 : _b.forEach(function(tspref) {
+        (_b = row_headers[2]) == null ? undefined : _b.forEach(function(tspref) {
           var oldref = parse_TSP_Reference(tspref.data);
           var newref = get_unique_msgid({ deps: [tmaref], location: deps[oldref].location, type: deps[oldref].type }, deps);
           numbers_del_oref(tmaroot, oldref);
@@ -24551,9 +24529,9 @@ function numbers_add_ws(cfb, deps, wsidx) {
               var parentidx = mlist[3].findIndex(function(m) {
                 var _a2, _b2;
                 var mm = parse_shallow(m.data);
-                if ((_a2 = mm[3]) == null ? void 0 : _a2[0])
+                if ((_a2 = mm[3]) == null ? undefined : _a2[0])
                   return u8str(mm[3][0].data) == loc;
-                if (((_b2 = mm[2]) == null ? void 0 : _b2[0]) && u8str(mm[2][0].data) == loc)
+                if (((_b2 = mm[2]) == null ? undefined : _b2[0]) && u8str(mm[2][0].data) == loc)
                   return true;
                 return false;
               });
@@ -24611,9 +24589,9 @@ function numbers_add_ws(cfb, deps, wsidx) {
               var parentidx = mlist[3].findIndex(function(m) {
                 var _a2, _b2;
                 var mm = parse_shallow(m.data);
-                if ((_a2 = mm[3]) == null ? void 0 : _a2[0])
+                if ((_a2 = mm[3]) == null ? undefined : _a2[0])
                   return u8str(mm[3][0].data) == loc;
-                if (((_b2 = mm[2]) == null ? void 0 : _b2[0]) && u8str(mm[2][0].data) == loc)
+                if (((_b2 = mm[2]) == null ? undefined : _b2[0]) && u8str(mm[2][0].data) == loc)
                   return true;
                 return false;
               });
@@ -24687,7 +24665,7 @@ function write_numbers_tma(cfb, deps, ws, tmaroot, tmafile, tmaref) {
       numbers_iwa_doit(cfb, deps, row_header_ref, function(rowhead, _x) {
         var _a;
         var base_bucket = parse_shallow(rowhead.messages[0].data);
-        if ((_a = base_bucket == null ? void 0 : base_bucket[2]) == null ? void 0 : _a[0])
+        if ((_a = base_bucket == null ? undefined : base_bucket[2]) == null ? undefined : _a[0])
           for (var R2 = 0; R2 < data.length; ++R2) {
             var _bucket = parse_shallow(base_bucket[2][0].data);
             _bucket[1][0].data = write_varint49(R2);
@@ -24720,7 +24698,7 @@ function write_numbers_tma(cfb, deps, ws, tmaroot, tmafile, tmaref) {
           var mlst = mlist[3].filter(function(m) {
             return varint_to_i32(parse_shallow(m.data)[1][0].data) == tileref;
           });
-          return (mlst == null ? void 0 : mlst.length) ? varint_to_i32(parse_shallow(mlst[0].data)[12][0].data) : 0;
+          return (mlst == null ? undefined : mlst.length) ? varint_to_i32(parse_shallow(mlst[0].data)[12][0].data) : 0;
         }();
         {
           CFB.utils.cfb_del(cfb, deps[tileref].location);
@@ -24732,9 +24710,9 @@ function write_numbers_tma(cfb, deps, ws, tmaroot, tmafile, tmaref) {
             var parentidx = mlist[3].findIndex(function(m) {
               var _a, _b;
               var mm = parse_shallow(m.data);
-              if ((_a = mm[3]) == null ? void 0 : _a[0])
+              if ((_a = mm[3]) == null ? undefined : _a[0])
                 return u8str(mm[3][0].data) == loc;
-              if (((_b = mm[2]) == null ? void 0 : _b[0]) && u8str(mm[2][0].data) == loc)
+              if (((_b = mm[2]) == null ? undefined : _b[0]) && u8str(mm[2][0].data) == loc)
                 return true;
               return false;
             });
@@ -24806,9 +24784,9 @@ function write_numbers_tma(cfb, deps, ws, tmaroot, tmafile, tmaref) {
             var parentidx = mlist[3].findIndex(function(m) {
               var _a, _b;
               var mm = parse_shallow(m.data);
-              if ((_a = mm[3]) == null ? void 0 : _a[0])
+              if ((_a = mm[3]) == null ? undefined : _a[0])
                 return u8str(mm[3][0].data) == loc;
-              if (((_b = mm[2]) == null ? void 0 : _b[0]) && u8str(mm[2][0].data) == loc)
+              if (((_b = mm[2]) == null ? undefined : _b[0]) && u8str(mm[2][0].data) == loc)
                 return true;
               return false;
             });
@@ -24867,9 +24845,9 @@ function write_numbers_tma(cfb, deps, ws, tmaroot, tmafile, tmaref) {
           var parentidx = mlist[3].findIndex(function(m) {
             var _a, _b;
             var mm = parse_shallow(m.data);
-            if ((_a = mm[3]) == null ? void 0 : _a[0])
+            if ((_a = mm[3]) == null ? undefined : _a[0])
               return u8str(mm[3][0].data) == loc;
-            if (((_b = mm[2]) == null ? void 0 : _b[0]) && u8str(mm[2][0].data) == loc)
+            if (((_b = mm[2]) == null ? undefined : _b[0]) && u8str(mm[2][0].data) == loc)
               return true;
             return false;
           });
@@ -25908,7 +25886,7 @@ function make_json_row(sheet/*:Worksheet*/, r/*:Range*/, R/*:number*/, cols/*:Ar
 		var v = val.v;
 		switch(val.t){
 			case 'z': if(v == null) break; continue;
-			case 'e': v = (v == 0 ? null : void 0); break;
+			case 'e': v = (v == 0 ? null : undefined); break;
 			case 's': case 'd': case 'b': case 'n': break;
 			default: throw new Error('unrecognized type ' + val.t);
 		}
