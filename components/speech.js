@@ -4,11 +4,12 @@ import { TreeBase } from "./treebase";
 import { html } from "uhtml";
 import Globals from "app/globals";
 import * as Props from "./props";
+import { Howl } from "howler"; // Ensure Howler.js is installed
 
 /**
  * Speech component using Azure Speech SDK.
- * Synthesizes speech via Azure and plays the audio using the Web Audio API.
- * The volume (loudness) is controlled via a GainNode.
+ * Synthesizes speech via Azure and plays the audio using Howler.js,
+ * which provides robust volume control.
  */
 class Speech extends TreeBase {
   // App properties
@@ -22,8 +23,6 @@ class Speech extends TreeBase {
 
   constructor() {
     super();
-    // Create a persistent AudioContext (reused across calls)
-    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     this.initSynthesizer();
   }
 
@@ -32,34 +31,30 @@ class Speech extends TreeBase {
   }
 
   /**
-   * Initializes the Azure Speech synthesizer without providing an audio output configuration.
-   * This allows us to handle playback manually.
+   * Initializes the Azure Speech synthesizer without an audio config,
+   * so playback is handled manually.
    */
   initSynthesizer() {
     // Replace these with your actual subscription key and region
     this.speechConfig = sdk.SpeechConfig.fromSubscription(
-      'YOUR_SUBSCRIPTION_KEY_HERE', 
+      'YOUR_SUBSCRIPTION_KEY_HERE',
       'YOUR_SERVICE_REGION_HERE'
     );
     this.speechConfig.speechSynthesisOutputFormat =
       sdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3;
-
-    // Create the synthesizer without an audio config (manual playback)
+    // Create synthesizer without an audio config
     this.synthesizer = new sdk.SpeechSynthesizer(this.speechConfig);
-
     this.synthesizer.synthesisStarted = (s, e) => {
       this.startTime = performance.now();
       this.logWithTimestamp("Synthesis started");
     };
-
     this.synthesizer.synthesisCompleted = (s, e) => {
       const latency = performance.now() - this.startTime;
       this.logWithTimestamp(`Synthesis completed in ${latency.toFixed(2)} ms`);
       this.isSpeaking = false;
-      // Reinitialize the synthesizer for the next call
+      // Reinitialize synthesizer for next call
       this.initSynthesizer();
     };
-
     this.synthesizer.synthesisCanceled = (s, e) => {
       this.logWithTimestamp(`Synthesis canceled: ${e.reason}`);
       this.isSpeaking = false;
@@ -68,8 +63,8 @@ class Speech extends TreeBase {
   }
 
   /**
-   * Initiates speech synthesis and plays the audio through a GainNode.
-   * This should allow adjusting the audible volume.
+   * Initiates speech synthesis and plays the audio using Howler.js.
+   * Howler.js will apply the desired volume to the output.
    */
   async speak() {
     if (this.isSpeaking) {
@@ -85,7 +80,7 @@ class Speech extends TreeBase {
     const style = state.get(this.expressStyle.value) || "friendly";
     const volValue = state.get(this.volume.value);
     
-    // Log volume for debugging
+    // Log the volume for debugging
     this.logWithTimestamp(`Volume value from state: ${volValue}`);
 
     if (!message) {
@@ -98,7 +93,7 @@ class Speech extends TreeBase {
       `Synthesizing with voice: ${voice}, style: ${style}, volume: ${volValue}, message: ${message}`
     );
 
-    // Build SSML (without volume tags—volume is controlled at playback)
+    // Build SSML (volume not set in SSML; we'll control playback volume)
     const ssml = `
       <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
         <voice name="${voice}">
@@ -116,36 +111,22 @@ class Speech extends TreeBase {
           const latency = performance.now() - this.startTime;
           if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
             this.logWithTimestamp(`Synthesis successful in ${latency.toFixed(2)} ms`);
-            // Get the audio data (ensure it's an ArrayBuffer)
-            const arrayBuffer = result.audioData instanceof ArrayBuffer
-              ? result.audioData
-              : result.audioData.buffer;
-            // Resume AudioContext if needed (some browsers suspend it)
-            if (this.audioContext.state === "suspended") {
-              this.audioContext.resume();
-            }
-            // Decode the audio data
-            this.audioContext.decodeAudioData(arrayBuffer)
-              .then((decodedData) => {
-                // Create a source and gain node
-                const source = this.audioContext.createBufferSource();
-                source.buffer = decodedData;
-                const gainNode = this.audioContext.createGain();
-                gainNode.gain.value = volValue; // Apply the volume from state
-                // Connect the audio nodes: source -> gain -> destination
-                source.connect(gainNode);
-                gainNode.connect(this.audioContext.destination);
-                // Start playback
-                source.start(0);
-              })
-              .catch((error) => {
-                this.logWithTimestamp(`Error decoding audio data: ${error}`);
-              });
+            // Create a blob from the synthesized audio data
+            const audioBlob = new Blob([result.audioData], { type: 'audio/mp3' });
+            const url = URL.createObjectURL(audioBlob);
+            // Use Howler.js to play the audio with the specified volume
+            const sound = new Howl({
+              src: [url],
+              volume: volValue, // Howler volume: 0.0 (mute) to 1.0 (full)
+              onend: () => {
+                // Optionally revoke the object URL after playback ends
+                URL.revokeObjectURL(url);
+              }
+            });
+            sound.play();
           } else if (result.reason === sdk.ResultReason.Canceled) {
             const cancellationDetails = sdk.SpeechSynthesisCancellationDetails.fromResult(result);
-            this.logWithTimestamp(
-              `Synthesis canceled: ${cancellationDetails.reason}, ${cancellationDetails.errorDetails}`
-            );
+            this.logWithTimestamp(`Synthesis canceled: ${cancellationDetails.reason}, ${cancellationDetails.errorDetails}`);
           }
           this.isSpeaking = false;
           this.initSynthesizer();
@@ -164,7 +145,7 @@ class Speech extends TreeBase {
   }
 
   /**
-   * Escapes special characters for SSML.
+   * Escapes special characters for safe SSML usage.
    * @param {string} text - Text to escape.
    * @returns {string} Escaped text.
    */
