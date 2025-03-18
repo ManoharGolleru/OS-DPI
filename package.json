@@ -29,7 +29,8 @@
     "stacktrace-js": "^2.0.2",
     "tracky-mouse": "^1.0.0",
     "uhtml": "^4.5.11",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.19.3/xlsx-0.19.3.tgz"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.19.3/xlsx-0.19.3.tgz",
+    "howler": "^2.2.3"
   },
   "type": "module"
 }
