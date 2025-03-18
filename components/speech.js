@@ -37,8 +37,8 @@ class Speech extends TreeBase {
   initSynthesizer() {
     // Replace these with your actual subscription key and region
     this.speechConfig = sdk.SpeechConfig.fromSubscription(
-      'YOUR_SUBSCRIPTION_KEY_HERE',
-      'YOUR_SERVICE_REGION_HERE'
+      'c7d8e36fdf414cbaae05819919fd416d',
+      'eastus'
     );
     this.speechConfig.speechSynthesisOutputFormat =
       sdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3;
