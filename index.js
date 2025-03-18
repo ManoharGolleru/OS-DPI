@@ -3877,7 +3877,7 @@ const udomdiff = (parentNode, a, b, get, before) => {
   return b;
 };
 
-const { isArray: isArray$3 } = Array;
+const { isArray: isArray$2 } = Array;
 const { getPrototypeOf: getPrototypeOf$1, getOwnPropertyDescriptor } = Object;
 
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
@@ -4082,7 +4082,7 @@ const at = (element, value, name) => {
   const known = listeners.get(element) || set(listeners, element, {});
   let current = known[name];
   if (current && current[0]) element.removeEventListener(name, ...current);
-  current = isArray$3(value) ? value : [value, false];
+  current = isArray$2(value) ? value : [value, false];
   known[name] = current;
   if (current[0]) element.addEventListener(name, ...current);
   return value;
@@ -4485,7 +4485,7 @@ const resolve = (template, values, xml) => {
       if (node.nodeType === COMMENT_NODE) {
         if (node.data === search) {
           // ⚠️ once array, always array!
-          const update = isArray$3(values[i - 1]) ? array : hole;
+          const update = isArray$2(values[i - 1]) ? array : hole;
           if (update === hole) replace.push(node);
           entries.push(abc(createPath(node), update, null));
           search = `${prefix}${i++}`;
@@ -4688,7 +4688,7 @@ var lowercase = function (string) {
  * @param {*} value Reference to check.
  * @returns {boolean} True if `value` is an `Array`.
  */
-var isArray$2 = Array.isArray;
+var isArray$1 = Array.isArray;
 
 var manualLowercase = function (s) {
 	return isString(s)
@@ -4737,7 +4737,7 @@ function isArrayLike$1(obj) {
 	// * jqLite is either the jQuery or jqLite constructor function
 	// * we have to check the existence of jqLite first as this method is called
 	//   via the forEach method when constructing the jqLite object in the first place
-	if (isArray$2(obj) || isString(obj) || (jqLite)) {
+	if (isArray$1(obj) || isString(obj) || (jqLite)) {
 		return true;
 	}
 
@@ -4803,7 +4803,7 @@ function forEach(obj, iterator, context) {
 					iterator.call(context, obj[key], key, obj);
 				}
 			}
-		} else if (isArray$2(obj) || isArrayLike$1(obj)) {
+		} else if (isArray$1(obj) || isArrayLike$1(obj)) {
 			var isPrimitive = typeof obj !== "object";
 			for (key = 0, length = obj.length; key < length; key++) {
 				if (isPrimitive || key in obj) {
@@ -5053,7 +5053,7 @@ function copy(source, destination) {
 	function copyRecurse(source, destination) {
 		var h = destination.$$hashKey;
 		var key;
-		if (isArray$2(source)) {
+		if (isArray$1(source)) {
 			for (var i = 0, ii = source.length; i < ii; i++) {
 				destination.push(copyElement(source[i]));
 			}
@@ -5105,7 +5105,7 @@ function copy(source, destination) {
 		var destination = copyType(source);
 
 		if (destination === undefined) {
-			destination = isArray$2(source)
+			destination = isArray$1(source)
 				? []
 				: Object.create(getPrototypeOf(source));
 			needsRecurse = true;
@@ -8928,7 +8928,7 @@ function unzipSync(data, opts) {
     return files;
 }
 
-const e$1=(()=>{if("undefined"==typeof self)return  false;if("top"in self&&self!==top)try{top.window.document._=0;}catch(e){return  false}return "showOpenFilePicker"in self})(),t$1=e$1?Promise.resolve().then(function(){return l}):Promise.resolve().then(function(){return v});async function n(...e){return (await t$1).default(...e)}e$1?Promise.resolve().then(function(){return y}):Promise.resolve().then(function(){return b});const a=e$1?Promise.resolve().then(function(){return m}):Promise.resolve().then(function(){return k});async function o$1(...e){return (await a).default(...e)}const s=async e=>{const t=await e.getFile();return t.handle=e,t};var c=async(e=[{}])=>{Array.isArray(e)||(e=[e]);const t=[];e.forEach((e,n)=>{t[n]={description:e.description||"Files",accept:{}},e.mimeTypes?e.mimeTypes.map(r=>{t[n].accept[r]=e.extensions||[];}):t[n].accept["*/*"]=e.extensions||[];});const n=await window.showOpenFilePicker({id:e[0].id,startIn:e[0].startIn,types:t,multiple:e[0].multiple||false,excludeAcceptAllOption:e[0].excludeAcceptAllOption||false}),r=await Promise.all(n.map(s));return e[0].multiple?r:r[0]},l={__proto__:null,default:c};function u(e){function t(e){if(Object(e)!==e)return Promise.reject(new TypeError(e+" is not an object."));var t=e.done;return Promise.resolve(e.value).then(function(e){return {value:e,done:t}})}return u=function(e){this.s=e,this.n=e.next;},u.prototype={s:null,n:null,next:function(){return t(this.n.apply(this.s,arguments))},return:function(e){var n=this.s.return;return undefined===n?Promise.resolve({value:e,done:true}):t(n.apply(this.s,arguments))},throw:function(e){var n=this.s.return;return undefined===n?Promise.reject(e):t(n.apply(this.s,arguments))}},new u(e)}const p=async(e,t,n=e.name,r)=>{const i=[],a=[];var o,s=false,c=false;try{for(var l,d=function(e){var t,n,r,i=2;for("undefined"!=typeof Symbol&&(n=Symbol.asyncIterator,r=Symbol.iterator);i--;){if(n&&null!=(t=e[n]))return t.call(e);if(r&&null!=(t=e[r]))return new u(t.call(e));n="@@asyncIterator",r="@@iterator";}throw new TypeError("Object is not async iterable")}(e.values());s=!(l=await d.next()).done;s=!1){const o=l.value,s=`${n}/${o.name}`;"file"===o.kind?a.push(o.getFile().then(t=>(t.directoryHandle=e,t.handle=o,Object.defineProperty(t,"webkitRelativePath",{configurable:!0,enumerable:!0,get:()=>s})))):"directory"!==o.kind||!t||r&&r(o)||i.push(p(o,t,s,r));}}catch(e){c=true,o=e;}finally{try{s&&null!=d.return&&await d.return();}finally{if(c)throw o}}return [...(await Promise.all(i)).flat(),...await Promise.all(a)]};var d=async(e={})=>{e.recursive=e.recursive||false,e.mode=e.mode||"read";const t=await window.showDirectoryPicker({id:e.id,startIn:e.startIn,mode:e.mode});return (await(await t.values()).next()).done?[t]:p(t,e.recursive,undefined,e.skipDirectory)},y={__proto__:null,default:d},f$1=async(e,t=[{}],n=null,r=false,i=null)=>{Array.isArray(t)||(t=[t]),t[0].fileName=t[0].fileName||"Untitled";const a=[];let o=null;if(e instanceof Blob&&e.type?o=e.type:e.headers&&e.headers.get("content-type")&&(o=e.headers.get("content-type")),t.forEach((e,t)=>{a[t]={description:e.description||"Files",accept:{}},e.mimeTypes?(0===t&&o&&e.mimeTypes.push(o),e.mimeTypes.map(n=>{a[t].accept[n]=e.extensions||[];})):o?a[t].accept[o]=e.extensions||[]:a[t].accept["*/*"]=e.extensions||[];}),n)try{await n.getFile();}catch(e){if(n=null,r)throw e}const s=n||await window.showSaveFilePicker({suggestedName:t[0].fileName,id:t[0].id,startIn:t[0].startIn,types:a,excludeAcceptAllOption:t[0].excludeAcceptAllOption||false});!n&&i&&i(s);const c=await s.createWritable();if("stream"in e){const t=e.stream();return await t.pipeTo(c),s}return "body"in e?(await e.body.pipeTo(c),s):(await c.write(await e),await c.close(),s)},m={__proto__:null,default:f$1},w=async(e=[{}])=>(Array.isArray(e)||(e=[e]),new Promise((t,n)=>{const r=document.createElement("input");r.type="file";const i=[...e.map(e=>e.mimeTypes||[]),...e.map(e=>e.extensions||[])].join();r.multiple=e[0].multiple||false,r.accept=i||"",r.style.display="none",document.body.append(r);const a=e=>{"function"==typeof o&&o(),t(e);},o=e[0].legacySetup&&e[0].legacySetup(a,()=>o(n),r),s=()=>{window.removeEventListener("focus",s),r.remove();};r.addEventListener("click",()=>{window.addEventListener("focus",s);}),r.addEventListener("change",()=>{window.removeEventListener("focus",s),r.remove(),a(r.multiple?Array.from(r.files):r.files[0]);}),"showPicker"in HTMLInputElement.prototype?r.showPicker():r.click();})),v={__proto__:null,default:w},h=async(e=[{}])=>(Array.isArray(e)||(e=[e]),e[0].recursive=e[0].recursive||false,new Promise((t,n)=>{const r=document.createElement("input");r.type="file",r.webkitdirectory=true;const i=e=>{"function"==typeof a&&a(),t(e);},a=e[0].legacySetup&&e[0].legacySetup(i,()=>a(n),r);r.addEventListener("change",()=>{let t=Array.from(r.files);e[0].recursive?e[0].recursive&&e[0].skipDirectory&&(t=t.filter(t=>t.webkitRelativePath.split("/").every(t=>!e[0].skipDirectory({name:t,kind:"directory"})))):t=t.filter(e=>2===e.webkitRelativePath.split("/").length),i(t);}),"showPicker"in HTMLInputElement.prototype?r.showPicker():r.click();})),b={__proto__:null,default:h},P=async(e,t={})=>{Array.isArray(t)&&(t=t[0]);const n=document.createElement("a");let r=e;"body"in e&&(r=await async function(e,t){const n=e.getReader(),r=new ReadableStream({start:e=>async function t(){return n.read().then(({done:n,value:r})=>{if(!n)return e.enqueue(r),t();e.close();})}()}),i=new Response(r),a=await i.blob();return n.releaseLock(),new Blob([a],{type:t})}(e.body,e.headers.get("content-type"))),n.download=t.fileName||"Untitled",n.href=URL.createObjectURL(await r);const i=()=>{"function"==typeof a&&a();},a=t.legacySetup&&t.legacySetup(i,()=>a(),n);return n.addEventListener("click",()=>{setTimeout(()=>URL.revokeObjectURL(n.href),3e4),i();}),n.click(),null},k={__proto__:null,default:P};
+const e$1=(()=>{if("undefined"==typeof self)return  false;if("top"in self&&self!==top)try{top.window.document._=0;}catch(e){return  false}return "showOpenFilePicker"in self})(),t$1=e$1?Promise.resolve().then(function(){return l}):Promise.resolve().then(function(){return v});async function n(...e){return (await t$1).default(...e)}e$1?Promise.resolve().then(function(){return y}):Promise.resolve().then(function(){return b});const a=e$1?Promise.resolve().then(function(){return m}):Promise.resolve().then(function(){return k});async function o$1(...e){return (await a).default(...e)}const s=async e=>{const t=await e.getFile();return t.handle=e,t};var c=async(e=[{}])=>{Array.isArray(e)||(e=[e]);const t=[];e.forEach((e,n)=>{t[n]={description:e.description||"Files",accept:{}},e.mimeTypes?e.mimeTypes.map(r=>{t[n].accept[r]=e.extensions||[];}):t[n].accept["*/*"]=e.extensions||[];});const n=await window.showOpenFilePicker({id:e[0].id,startIn:e[0].startIn,types:t,multiple:e[0].multiple||false,excludeAcceptAllOption:e[0].excludeAcceptAllOption||false}),r=await Promise.all(n.map(s));return e[0].multiple?r:r[0]},l={__proto__:null,default:c};function u(e){function t(e){if(Object(e)!==e)return Promise.reject(new TypeError(e+" is not an object."));var t=e.done;return Promise.resolve(e.value).then(function(e){return {value:e,done:t}})}return u=function(e){this.s=e,this.n=e.next;},u.prototype={s:null,n:null,next:function(){return t(this.n.apply(this.s,arguments))},return:function(e){var n=this.s.return;return void 0===n?Promise.resolve({value:e,done:true}):t(n.apply(this.s,arguments))},throw:function(e){var n=this.s.return;return void 0===n?Promise.reject(e):t(n.apply(this.s,arguments))}},new u(e)}const p=async(e,t,n=e.name,r)=>{const i=[],a=[];var o,s=false,c=false;try{for(var l,d=function(e){var t,n,r,i=2;for("undefined"!=typeof Symbol&&(n=Symbol.asyncIterator,r=Symbol.iterator);i--;){if(n&&null!=(t=e[n]))return t.call(e);if(r&&null!=(t=e[r]))return new u(t.call(e));n="@@asyncIterator",r="@@iterator";}throw new TypeError("Object is not async iterable")}(e.values());s=!(l=await d.next()).done;s=!1){const o=l.value,s=`${n}/${o.name}`;"file"===o.kind?a.push(o.getFile().then(t=>(t.directoryHandle=e,t.handle=o,Object.defineProperty(t,"webkitRelativePath",{configurable:!0,enumerable:!0,get:()=>s})))):"directory"!==o.kind||!t||r&&r(o)||i.push(p(o,t,s,r));}}catch(e){c=true,o=e;}finally{try{s&&null!=d.return&&await d.return();}finally{if(c)throw o}}return [...(await Promise.all(i)).flat(),...await Promise.all(a)]};var d=async(e={})=>{e.recursive=e.recursive||false,e.mode=e.mode||"read";const t=await window.showDirectoryPicker({id:e.id,startIn:e.startIn,mode:e.mode});return (await(await t.values()).next()).done?[t]:p(t,e.recursive,void 0,e.skipDirectory)},y={__proto__:null,default:d},f$1=async(e,t=[{}],n=null,r=false,i=null)=>{Array.isArray(t)||(t=[t]),t[0].fileName=t[0].fileName||"Untitled";const a=[];let o=null;if(e instanceof Blob&&e.type?o=e.type:e.headers&&e.headers.get("content-type")&&(o=e.headers.get("content-type")),t.forEach((e,t)=>{a[t]={description:e.description||"Files",accept:{}},e.mimeTypes?(0===t&&o&&e.mimeTypes.push(o),e.mimeTypes.map(n=>{a[t].accept[n]=e.extensions||[];})):o?a[t].accept[o]=e.extensions||[]:a[t].accept["*/*"]=e.extensions||[];}),n)try{await n.getFile();}catch(e){if(n=null,r)throw e}const s=n||await window.showSaveFilePicker({suggestedName:t[0].fileName,id:t[0].id,startIn:t[0].startIn,types:a,excludeAcceptAllOption:t[0].excludeAcceptAllOption||false});!n&&i&&i(s);const c=await s.createWritable();if("stream"in e){const t=e.stream();return await t.pipeTo(c),s}return "body"in e?(await e.body.pipeTo(c),s):(await c.write(await e),await c.close(),s)},m={__proto__:null,default:f$1},w=async(e=[{}])=>(Array.isArray(e)||(e=[e]),new Promise((t,n)=>{const r=document.createElement("input");r.type="file";const i=[...e.map(e=>e.mimeTypes||[]),...e.map(e=>e.extensions||[])].join();r.multiple=e[0].multiple||false,r.accept=i||"",r.style.display="none",document.body.append(r);const a=e=>{"function"==typeof o&&o(),t(e);},o=e[0].legacySetup&&e[0].legacySetup(a,()=>o(n),r),s=()=>{window.removeEventListener("focus",s),r.remove();};r.addEventListener("click",()=>{window.addEventListener("focus",s);}),r.addEventListener("change",()=>{window.removeEventListener("focus",s),r.remove(),a(r.multiple?Array.from(r.files):r.files[0]);}),"showPicker"in HTMLInputElement.prototype?r.showPicker():r.click();})),v={__proto__:null,default:w},h=async(e=[{}])=>(Array.isArray(e)||(e=[e]),e[0].recursive=e[0].recursive||false,new Promise((t,n)=>{const r=document.createElement("input");r.type="file",r.webkitdirectory=true;const i=e=>{"function"==typeof a&&a(),t(e);},a=e[0].legacySetup&&e[0].legacySetup(i,()=>a(n),r);r.addEventListener("change",()=>{let t=Array.from(r.files);e[0].recursive?e[0].recursive&&e[0].skipDirectory&&(t=t.filter(t=>t.webkitRelativePath.split("/").every(t=>!e[0].skipDirectory({name:t,kind:"directory"})))):t=t.filter(e=>2===e.webkitRelativePath.split("/").length),i(t);}),"showPicker"in HTMLInputElement.prototype?r.showPicker():r.click();})),b={__proto__:null,default:h},P=async(e,t={})=>{Array.isArray(t)&&(t=t[0]);const n=document.createElement("a");let r=e;"body"in e&&(r=await async function(e,t){const n=e.getReader(),r=new ReadableStream({start:e=>async function t(){return n.read().then(({done:n,value:r})=>{if(!n)return e.enqueue(r),t();e.close();})}()}),i=new Response(r),a=await i.blob();return n.releaseLock(),new Blob([a],{type:t})}(e.body,e.headers.get("content-type"))),n.download=t.fileName||"Untitled",n.href=URL.createObjectURL(await r);const i=()=>{"function"==typeof a&&a();},a=t.legacySetup&&t.legacySetup(i,()=>a(),n);return n.addEventListener("click",()=>{setTimeout(()=>URL.revokeObjectURL(n.href),3e4),i();}),n.click(),null},k={__proto__:null,default:P};
 
 class DB {
   constructor() {
@@ -12467,7 +12467,7 @@ class Data {
   }
 }
 
-const e=Object.assign||((e,t)=>(t&&Object.keys(t).forEach(o=>e[o]=t[o]),e)),t=(e,r,s)=>{const c=typeof s;if(s&&"object"===c)if(Array.isArray(s))for(const o of s)r=t(e,r,o);else for(const c of Object.keys(s)){const f=s[c];"function"==typeof f?r[c]=f(r[c],o):undefined===f?e&&!isNaN(c)?r.splice(c,1):delete r[c]:null===f||"object"!=typeof f||Array.isArray(f)?r[c]=f:"object"==typeof r[c]?r[c]=f===r[c]?f:o(r[c],f):r[c]=t(false,{},f);}else "function"===c&&(r=s(r,o));return r},o=(o,...r)=>{const s=Array.isArray(o);return t(s,s?o.slice():e({},o),r)};
+const e=Object.assign||((e,t)=>(t&&Object.keys(t).forEach(o=>e[o]=t[o]),e)),t=(e,r,s)=>{const c=typeof s;if(s&&"object"===c)if(Array.isArray(s))for(const o of s)r=t(e,r,o);else for(const c of Object.keys(s)){const f=s[c];"function"==typeof f?r[c]=f(r[c],o):void 0===f?e&&!isNaN(c)?r.splice(c,1):delete r[c]:null===f||"object"!=typeof f||Array.isArray(f)?r[c]=f:"object"==typeof r[c]?r[c]=f===r[c]?f:o(r[c],f):r[c]=t(false,{},f);}else "function"===c&&(r=s(r,o));return r},o=(o,...r)=>{const s=Array.isArray(o);return t(s,s?o.slice():e({},o),r)};
 
 let State$1 = class State {
   constructor(persistKey = "") {
@@ -13223,7 +13223,7 @@ const scriptRel = 'modulepreload';const assetsURL = function(dep) { return "/OS-
 };
 
 async function readSheetFromBlob(blob) {
-  const XLSX = await __vitePreload(() => import('./xlsx.js'),true?[]:undefined);
+  const XLSX = await __vitePreload(() => import('./xlsx.js'),true?[]:void 0);
   const data = await blob.arrayBuffer();
   const workbook = XLSX.read(data, { codepage: 65001 });
   /** @type {Rows} */
@@ -13302,7 +13302,7 @@ async function readSheetFromBlob(blob) {
  * @param {string} type
  */
 async function saveContent(name, rows, type) {
-  const XLSX = await __vitePreload(() => import('./xlsx.js'),true?[]:undefined);
+  const XLSX = await __vitePreload(() => import('./xlsx.js'),true?[]:void 0);
   const sheetNames = new Set(rows.map((row) => row.sheetName || "sheet1"));
   const workbook = XLSX.utils.book_new();
   for (const sheetName of sheetNames) {
@@ -14463,14 +14463,14 @@ var regex = {};
 Object.defineProperty(regex, "__esModule", {
   value: true
 });
-regex.default = undefined;
+regex.default = void 0;
 var _default$c = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000)$/i;
 regex.default = _default$c;
 
 Object.defineProperty(validate$1, "__esModule", {
   value: true
 });
-validate$1.default = undefined;
+validate$1.default = void 0;
 
 var _regex = _interopRequireDefault$8(regex);
 
@@ -14486,7 +14486,7 @@ validate$1.default = _default$b;
 Object.defineProperty(stringify$1, "__esModule", {
   value: true
 });
-stringify$1.default = undefined;
+stringify$1.default = void 0;
 stringify$1.unsafeStringify = unsafeStringify;
 
 var _validate$2 = _interopRequireDefault$7(validate$1);
@@ -14529,7 +14529,7 @@ stringify$1.default = _default$a;
 Object.defineProperty(v1$1, "__esModule", {
   value: true
 });
-v1$1.default = undefined;
+v1$1.default = void 0;
 
 var _rng$1 = _interopRequireDefault$6(rng$1);
 
@@ -14641,7 +14641,7 @@ var parse$1 = {};
 Object.defineProperty(parse$1, "__esModule", {
   value: true
 });
-parse$1.default = undefined;
+parse$1.default = void 0;
 
 var _validate$1 = _interopRequireDefault$5(validate$1);
 
@@ -14685,7 +14685,7 @@ parse$1.default = _default$8;
 Object.defineProperty(v35$1, "__esModule", {
   value: true
 });
-v35$1.URL = v35$1.DNS = undefined;
+v35$1.URL = v35$1.DNS = void 0;
 v35$1.default = v35;
 
 var _stringify$1 = stringify$1;
@@ -14723,7 +14723,7 @@ function v35(name, version, hashfunc) {
       namespace = (0, _parse.default)(namespace);
     }
 
-    if (((_namespace = namespace) === null || _namespace === undefined ? undefined : _namespace.length) !== 16) {
+    if (((_namespace = namespace) === null || _namespace === void 0 ? void 0 : _namespace.length) !== 16) {
       throw TypeError('Namespace must be array-like (16 iterable integer values, 0-255)');
     } // Compute hash of namespace and value, Per 4.3
     // Future: Use spread syntax when supported on all platforms, e.g. `bytes =
@@ -14766,7 +14766,7 @@ var md5$1 = {};
 Object.defineProperty(md5$1, "__esModule", {
   value: true
 });
-md5$1.default = undefined;
+md5$1.default = void 0;
 
 /*
  * Browser-compatible JavaScript MD5
@@ -14988,7 +14988,7 @@ md5$1.default = _default$7;
 Object.defineProperty(v3$1, "__esModule", {
   value: true
 });
-v3$1.default = undefined;
+v3$1.default = void 0;
 
 var _v$1 = _interopRequireDefault$3(v35$1);
 
@@ -15007,7 +15007,7 @@ var native = {};
 Object.defineProperty(native, "__esModule", {
   value: true
 });
-native.default = undefined;
+native.default = void 0;
 const randomUUID = typeof crypto !== 'undefined' && crypto.randomUUID && crypto.randomUUID.bind(crypto);
 var _default$5 = {
   randomUUID
@@ -15017,7 +15017,7 @@ native.default = _default$5;
 Object.defineProperty(v4$1, "__esModule", {
   value: true
 });
-v4$1.default = undefined;
+v4$1.default = void 0;
 
 var _native = _interopRequireDefault$2(native);
 
@@ -15063,7 +15063,7 @@ var sha1$1 = {};
 Object.defineProperty(sha1$1, "__esModule", {
   value: true
 });
-sha1$1.default = undefined;
+sha1$1.default = void 0;
 
 // Adapted from Chris Veness' SHA1 code at
 // http://www.movable-type.co.uk/scripts/sha1.html
@@ -15166,7 +15166,7 @@ sha1$1.default = _default$3;
 Object.defineProperty(v5$1, "__esModule", {
   value: true
 });
-v5$1.default = undefined;
+v5$1.default = void 0;
 
 var _v = _interopRequireDefault$1(v35$1);
 
@@ -15183,7 +15183,7 @@ var nil = {};
 Object.defineProperty(nil, "__esModule", {
   value: true
 });
-nil.default = undefined;
+nil.default = void 0;
 var _default$1 = '00000000-0000-0000-0000-000000000000';
 nil.default = _default$1;
 
@@ -15192,7 +15192,7 @@ var version$1 = {};
 Object.defineProperty(version$1, "__esModule", {
   value: true
 });
-version$1.default = undefined;
+version$1.default = void 0;
 
 var _validate = _interopRequireDefault(validate$1);
 
@@ -15293,7 +15293,7 @@ version$1.default = _default;
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(Guid, "__esModule", { value: true });
-Guid.createNoDashGuid = Guid.createGuid = undefined;
+Guid.createNoDashGuid = Guid.createGuid = void 0;
 const uuid_1 = commonjsBrowser;
 const createGuid = () => uuid_1.v4();
 Guid.createGuid = createGuid;
@@ -15304,7 +15304,7 @@ Guid.createNoDashGuid = createNoDashGuid;
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.PlatformEvent = exports.EventType = undefined;
+	exports.PlatformEvent = exports.EventType = void 0;
 	const Guid_js_1 = Guid;
 	(function (EventType) {
 	    EventType[EventType["Debug"] = 0] = "Debug";
@@ -15345,7 +15345,7 @@ Guid.createNoDashGuid = createNoDashGuid;
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(AudioSourceEvents, "__esModule", { value: true });
-AudioSourceEvents.AudioStreamNodeErrorEvent = AudioSourceEvents.AudioStreamNodeDetachedEvent = AudioSourceEvents.AudioStreamNodeAttachedEvent = AudioSourceEvents.AudioStreamNodeAttachingEvent = AudioSourceEvents.AudioStreamNodeEvent = AudioSourceEvents.AudioSourceErrorEvent = AudioSourceEvents.AudioSourceOffEvent = AudioSourceEvents.AudioSourceReadyEvent = AudioSourceEvents.AudioSourceInitializingEvent = AudioSourceEvents.AudioSourceEvent = undefined;
+AudioSourceEvents.AudioStreamNodeErrorEvent = AudioSourceEvents.AudioStreamNodeDetachedEvent = AudioSourceEvents.AudioStreamNodeAttachedEvent = AudioSourceEvents.AudioStreamNodeAttachingEvent = AudioSourceEvents.AudioStreamNodeEvent = AudioSourceEvents.AudioSourceErrorEvent = AudioSourceEvents.AudioSourceOffEvent = AudioSourceEvents.AudioSourceReadyEvent = AudioSourceEvents.AudioSourceInitializingEvent = AudioSourceEvents.AudioSourceEvent = void 0;
 /* eslint-disable max-classes-per-file */
 const PlatformEvent_js_1$3 = PlatformEvent;
 class AudioSourceEvent extends PlatformEvent_js_1$3.PlatformEvent {
@@ -15430,7 +15430,7 @@ var ConnectionEvents = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(ConnectionEvents, "__esModule", { value: true });
-ConnectionEvents.ConnectionMessageSentEvent = ConnectionEvents.ConnectionMessageReceivedEvent = ConnectionEvents.ConnectionEstablishErrorEvent = ConnectionEvents.ConnectionErrorEvent = ConnectionEvents.ConnectionClosedEvent = ConnectionEvents.ConnectionEstablishedEvent = ConnectionEvents.ConnectionStartEvent = ConnectionEvents.ConnectionEvent = ConnectionEvents.ServiceEvent = undefined;
+ConnectionEvents.ConnectionMessageSentEvent = ConnectionEvents.ConnectionMessageReceivedEvent = ConnectionEvents.ConnectionEstablishErrorEvent = ConnectionEvents.ConnectionErrorEvent = ConnectionEvents.ConnectionClosedEvent = ConnectionEvents.ConnectionEstablishedEvent = ConnectionEvents.ConnectionStartEvent = ConnectionEvents.ConnectionEvent = ConnectionEvents.ServiceEvent = void 0;
 const PlatformEvent_js_1$2 = PlatformEvent;
 class ServiceEvent extends PlatformEvent_js_1$2.PlatformEvent {
     constructor(eventName, jsonstring, eventType = PlatformEvent_js_1$2.EventType.Info) {
@@ -15550,7 +15550,7 @@ var _Error = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(_Error, "__esModule", { value: true });
-_Error.ObjectDisposedError = _Error.InvalidOperationError = _Error.ArgumentNullError = undefined;
+_Error.ObjectDisposedError = _Error.InvalidOperationError = _Error.ArgumentNullError = void 0;
 /* eslint-disable max-classes-per-file */
 /**
  * The error that is thrown when an argument passed in is null.
@@ -15625,7 +15625,7 @@ _Error.ObjectDisposedError = ObjectDisposedError;
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.ConnectionMessage = exports.MessageType = undefined;
+	exports.ConnectionMessage = exports.MessageType = void 0;
 	const Error_js_1 = _Error;
 	const Guid_js_1 = Guid;
 	var MessageType;
@@ -15690,7 +15690,7 @@ var ConnectionOpenResponse$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(ConnectionOpenResponse$1, "__esModule", { value: true });
-ConnectionOpenResponse$1.ConnectionOpenResponse = undefined;
+ConnectionOpenResponse$1.ConnectionOpenResponse = void 0;
 class ConnectionOpenResponse {
     constructor(statusCode, reason) {
         this.privStatusCode = statusCode;
@@ -15710,7 +15710,7 @@ var DeferralMap$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(DeferralMap$1, "__esModule", { value: true });
-DeferralMap$1.DeferralMap = undefined;
+DeferralMap$1.DeferralMap = void 0;
 /**
  * The error that is thrown when an argument passed in is null.
  *
@@ -15746,7 +15746,7 @@ var DialogEvents = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(DialogEvents, "__esModule", { value: true });
-DialogEvents.SendingAgentContextMessageEvent = DialogEvents.DialogEvent = undefined;
+DialogEvents.SendingAgentContextMessageEvent = DialogEvents.DialogEvent = void 0;
 const PlatformEvent_js_1$1 = PlatformEvent;
 class DialogEvent extends PlatformEvent_js_1$1.PlatformEvent {
     constructor(eventName, eventType = PlatformEvent_js_1$1.EventType.Info) {
@@ -15772,7 +15772,7 @@ var EventSource$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(EventSource$1, "__esModule", { value: true });
-EventSource$1.EventSource = undefined;
+EventSource$1.EventSource = void 0;
 const Error_js_1$6 = _Error;
 const Guid_js_1$2 = Guid;
 class EventSource {
@@ -15839,7 +15839,7 @@ EventSource$1.EventSource = EventSource;
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(Events$1, "__esModule", { value: true });
-Events$1.Events = undefined;
+Events$1.Events = void 0;
 const Error_js_1$5 = _Error;
 const EventSource_js_1 = EventSource$1;
 class Events {
@@ -15868,7 +15868,7 @@ var IConnection = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.ConnectionState = undefined;
+	exports.ConnectionState = void 0;
 	(function (ConnectionState) {
 	    ConnectionState[ConnectionState["None"] = 0] = "None";
 	    ConnectionState[ConnectionState["Connected"] = 1] = "Connected";
@@ -15930,7 +15930,7 @@ var List$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(List$1, "__esModule", { value: true });
-List$1.List = undefined;
+List$1.List = void 0;
 const Error_js_1$4 = _Error;
 class List {
     constructor(list) {
@@ -16138,7 +16138,7 @@ var _Promise = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.marshalPromiseToCallbacks = exports.Sink = exports.Deferred = exports.PromiseResultEventSource = exports.PromiseResult = exports.PromiseState = undefined;
+	exports.marshalPromiseToCallbacks = exports.Sink = exports.Deferred = exports.PromiseResultEventSource = exports.PromiseResult = exports.PromiseState = void 0;
 	/* eslint-disable max-classes-per-file, @typescript-eslint/typedef */
 	var PromiseState;
 	(function (PromiseState) {
@@ -16350,7 +16350,7 @@ var Queue$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(Queue$1, "__esModule", { value: true });
-Queue$1.Queue = undefined;
+Queue$1.Queue = void 0;
 const Error_js_1$3 = _Error;
 const List_js_1 = List$1;
 const Promise_js_1 = _Promise;
@@ -16522,7 +16522,7 @@ var RawWebsocketMessage$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(RawWebsocketMessage$1, "__esModule", { value: true });
-RawWebsocketMessage$1.RawWebsocketMessage = undefined;
+RawWebsocketMessage$1.RawWebsocketMessage = void 0;
 const ConnectionMessage_js_1 = ConnectionMessage$1;
 const Error_js_1$2 = _Error;
 const Guid_js_1$1 = Guid;
@@ -16573,7 +16573,7 @@ var RiffPcmEncoder$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(RiffPcmEncoder$1, "__esModule", { value: true });
-RiffPcmEncoder$1.RiffPcmEncoder = undefined;
+RiffPcmEncoder$1.RiffPcmEncoder = void 0;
 class RiffPcmEncoder {
     constructor(actualSampleRate, desiredSampleRate) {
         this.privActualSampleRate = actualSampleRate;
@@ -16633,7 +16633,7 @@ var Stream$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(Stream$1, "__esModule", { value: true });
-Stream$1.Stream = undefined;
+Stream$1.Stream = void 0;
 const Error_js_1$1 = _Error;
 const Guid_js_1 = Guid;
 const Queue_js_1 = Queue$1;
@@ -16707,7 +16707,7 @@ var TranslationStatus = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.TranslationStatus = undefined;
+	exports.TranslationStatus = void 0;
 	(function (TranslationStatus) {
 	    /**
 	     * @member TranslationStatus.Success
@@ -16732,7 +16732,7 @@ function requireChunkedArrayBufferStream () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(ChunkedArrayBufferStream, "__esModule", { value: true });
-	ChunkedArrayBufferStream.ChunkedArrayBufferStream = undefined;
+	ChunkedArrayBufferStream.ChunkedArrayBufferStream = void 0;
 	const Exports_js_1 = requireExports$5();
 	let ChunkedArrayBufferStream$1 = class ChunkedArrayBufferStream extends Exports_js_1.Stream {
 	    constructor(targetChunkSize, streamId) {
@@ -16802,7 +16802,7 @@ var Timeout$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(Timeout$1, "__esModule", { value: true });
-Timeout$1.Timeout = undefined;
+Timeout$1.Timeout = void 0;
 class Timeout {
     static load() {
         // Prefilling the Maps with a function indexed by zero is necessary to be compliant with the specification.
@@ -16902,7 +16902,7 @@ var OCSPEvents = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(OCSPEvents, "__esModule", { value: true });
-OCSPEvents.OCSPCacheUpdateErrorEvent = OCSPEvents.OCSPResponseRetrievedEvent = OCSPEvents.OCSPCacheFetchErrorEvent = OCSPEvents.OCSPVerificationFailedEvent = OCSPEvents.OCSPCacheHitEvent = OCSPEvents.OCSPCacheEntryNeedsRefreshEvent = OCSPEvents.OCSPCacheEntryExpiredEvent = OCSPEvents.OCSPWSUpgradeStartedEvent = OCSPEvents.OCSPStapleReceivedEvent = OCSPEvents.OCSPCacheUpdateCompleteEvent = OCSPEvents.OCSPDiskCacheStoreEvent = OCSPEvents.OCSPMemoryCacheStoreEvent = OCSPEvents.OCSPCacheUpdateNeededEvent = OCSPEvents.OCSPDiskCacheHitEvent = OCSPEvents.OCSPCacheMissEvent = OCSPEvents.OCSPMemoryCacheHitEvent = OCSPEvents.OCSPEvent = undefined;
+OCSPEvents.OCSPCacheUpdateErrorEvent = OCSPEvents.OCSPResponseRetrievedEvent = OCSPEvents.OCSPCacheFetchErrorEvent = OCSPEvents.OCSPVerificationFailedEvent = OCSPEvents.OCSPCacheHitEvent = OCSPEvents.OCSPCacheEntryNeedsRefreshEvent = OCSPEvents.OCSPCacheEntryExpiredEvent = OCSPEvents.OCSPWSUpgradeStartedEvent = OCSPEvents.OCSPStapleReceivedEvent = OCSPEvents.OCSPCacheUpdateCompleteEvent = OCSPEvents.OCSPDiskCacheStoreEvent = OCSPEvents.OCSPMemoryCacheStoreEvent = OCSPEvents.OCSPCacheUpdateNeededEvent = OCSPEvents.OCSPDiskCacheHitEvent = OCSPEvents.OCSPCacheMissEvent = OCSPEvents.OCSPMemoryCacheHitEvent = OCSPEvents.OCSPEvent = void 0;
 /* eslint-disable max-classes-per-file */
 const PlatformEvent_js_1 = PlatformEvent;
 class OCSPEvent extends PlatformEvent_js_1.PlatformEvent {
@@ -17029,7 +17029,7 @@ function requireBackgroundError () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(BackgroundError, "__esModule", { value: true });
-	BackgroundError.BackgroundEvent = undefined;
+	BackgroundError.BackgroundEvent = void 0;
 	const Exports_js_1 = requireExports$5();
 	class BackgroundEvent extends Exports_js_1.PlatformEvent {
 	    constructor(error) {
@@ -17110,7 +17110,7 @@ var HeaderNames$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(HeaderNames$1, "__esModule", { value: true });
-HeaderNames$1.HeaderNames = undefined;
+HeaderNames$1.HeaderNames = void 0;
 class HeaderNames {
 }
 HeaderNames$1.HeaderNames = HeaderNames;
@@ -17130,7 +17130,7 @@ var IAuthentication = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(IAuthentication, "__esModule", { value: true });
-IAuthentication.AuthInfo = undefined;
+IAuthentication.AuthInfo = void 0;
 class AuthInfo {
     constructor(headerName, token) {
         this.privHeaderName = headerName;
@@ -17148,7 +17148,7 @@ IAuthentication.AuthInfo = AuthInfo;
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(CognitiveSubscriptionKeyAuthentication$1, "__esModule", { value: true });
-CognitiveSubscriptionKeyAuthentication$1.CognitiveSubscriptionKeyAuthentication = undefined;
+CognitiveSubscriptionKeyAuthentication$1.CognitiveSubscriptionKeyAuthentication = void 0;
 const Exports_js_1$d = requireExports$5();
 const HeaderNames_js_1$3 = HeaderNames$1;
 const IAuthentication_js_1$1 = IAuthentication;
@@ -17197,7 +17197,7 @@ var CognitiveTokenAuthentication$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(CognitiveTokenAuthentication$1, "__esModule", { value: true });
-CognitiveTokenAuthentication$1.CognitiveTokenAuthentication = undefined;
+CognitiveTokenAuthentication$1.CognitiveTokenAuthentication = void 0;
 const Exports_js_1$c = requireExports$5();
 const IAuthentication_js_1 = IAuthentication;
 const HeaderNames_js_1$2 = HeaderNames$1;
@@ -17255,7 +17255,7 @@ var LogLevel = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.LogLevel = undefined;
+	exports.LogLevel = void 0;
 	const Exports_js_1 = requireExports$5();
 	Object.defineProperty(exports, "LogLevel", { enumerable: true, get: function () { return Exports_js_1.EventType; } });
 
@@ -17267,7 +17267,7 @@ var Contracts$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(Contracts$1, "__esModule", { value: true });
-Contracts$1.Contracts = undefined;
+Contracts$1.Contracts = void 0;
 /**
  * @class Contracts
  * @private
@@ -17350,7 +17350,7 @@ var __importStar$2 = (commonjsGlobal && commonjsGlobal.__importStar) || function
     return result;
 };
 Object.defineProperty(ConsoleLoggingListener$1, "__esModule", { value: true });
-ConsoleLoggingListener$1.ConsoleLoggingListener = undefined;
+ConsoleLoggingListener$1.ConsoleLoggingListener = void 0;
 const fs$1 = __importStar$2(require$$0);
 const LogLevel_js_1 = LogLevel;
 const Contracts_js_1$7 = Contracts$1;
@@ -17446,7 +17446,7 @@ var AudioStreamFormat = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.AudioStreamFormatImpl = exports.AudioStreamFormat = exports.AudioFormatTag = undefined;
+	exports.AudioStreamFormatImpl = exports.AudioStreamFormat = exports.AudioFormatTag = void 0;
 	// eslint-disable-next-line max-classes-per-file
 	var AudioFormatTag;
 	(function (AudioFormatTag) {
@@ -17644,7 +17644,7 @@ function requireMicAudioSource () {
 		// Copyright (c) Microsoft Corporation. All rights reserved.
 		// Licensed under the MIT license.
 		Object.defineProperty(exports, "__esModule", { value: true });
-		exports.MicAudioSource = exports.AudioWorkletSourceURLPropertyName = undefined;
+		exports.MicAudioSource = exports.AudioWorkletSourceURLPropertyName = void 0;
 		const Exports_js_1 = requireExports();
 		const Exports_js_2 = requireExports$5();
 		const AudioStreamFormat_js_1 = AudioStreamFormat;
@@ -17908,7 +17908,7 @@ function requireFileAudioSource () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(FileAudioSource, "__esModule", { value: true });
-	FileAudioSource.FileAudioSource = undefined;
+	FileAudioSource.FileAudioSource = void 0;
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
 	const AudioStreamFormat_js_1 = AudioStreamFormat;
@@ -18098,7 +18098,7 @@ var PCMRecorder = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(PCMRecorder, "__esModule", { value: true });
-PCMRecorder.PcmRecorder = undefined;
+PCMRecorder.PcmRecorder = void 0;
 const Exports_1 = requireExports$5();
 class PcmRecorder {
     constructor(stopInputOnRelease) {
@@ -18258,7 +18258,7 @@ var __importDefault = (commonjsGlobal && commonjsGlobal.__importDefault) || func
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(WebsocketMessageAdapter$1, "__esModule", { value: true });
-WebsocketMessageAdapter$1.WebsocketMessageAdapter = undefined;
+WebsocketMessageAdapter$1.WebsocketMessageAdapter = void 0;
 const net = __importStar$1(require$$0);
 const tls = __importStar$1(require$$0);
 const agent_base_1 = __importDefault(require$$0);
@@ -18564,7 +18564,7 @@ WebsocketMessageAdapter.forceNpmWebSocket = false;
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(WebsocketConnection$1, "__esModule", { value: true });
-WebsocketConnection$1.WebsocketConnection = undefined;
+WebsocketConnection$1.WebsocketConnection = void 0;
 const Exports_js_1$a = requireExports$5();
 const WebsocketMessageAdapter_js_1 = WebsocketMessageAdapter$1;
 class WebsocketConnection {
@@ -18646,7 +18646,7 @@ var ReplayableAudioNode$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(ReplayableAudioNode$1, "__esModule", { value: true });
-ReplayableAudioNode$1.ReplayableAudioNode = undefined;
+ReplayableAudioNode$1.ReplayableAudioNode = void 0;
 class ReplayableAudioNode {
     constructor(audioSource, bytesPerSecond) {
         this.privBuffers = [];
@@ -18792,7 +18792,7 @@ var __importStar = (commonjsGlobal && commonjsGlobal.__importStar) || function (
     return result;
 };
 Object.defineProperty(AudioFileWriter$1, "__esModule", { value: true });
-AudioFileWriter$1.AudioFileWriter = undefined;
+AudioFileWriter$1.AudioFileWriter = void 0;
 const fs = __importStar(require$$0);
 const Contracts_js_1$6 = Contracts$1;
 class AudioFileWriter {
@@ -18846,7 +18846,7 @@ function requireAudioInputStream () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(AudioInputStream, "__esModule", { value: true });
-	AudioInputStream.PullAudioInputStreamImpl = AudioInputStream.PullAudioInputStream = AudioInputStream.PushAudioInputStreamImpl = AudioInputStream.PushAudioInputStream = AudioInputStream.AudioInputStream = undefined;
+	AudioInputStream.PullAudioInputStreamImpl = AudioInputStream.PullAudioInputStream = AudioInputStream.PushAudioInputStreamImpl = AudioInputStream.PushAudioInputStream = AudioInputStream.AudioInputStream = void 0;
 	/* eslint-disable max-classes-per-file */
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
@@ -19190,7 +19190,7 @@ var SpeechSynthesisOutputFormat = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.SpeechSynthesisOutputFormat = undefined;
+	exports.SpeechSynthesisOutputFormat = void 0;
 	(function (SpeechSynthesisOutputFormat) {
 	    /**
 	     * raw-8khz-8bit-mono-mulaw
@@ -19422,7 +19422,7 @@ var SpeechSynthesisOutputFormat = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(AudioOutputFormat, "__esModule", { value: true });
-AudioOutputFormat.AudioOutputFormatImpl = undefined;
+AudioOutputFormat.AudioOutputFormatImpl = void 0;
 const SpeechSynthesisOutputFormat_js_1 = SpeechSynthesisOutputFormat;
 const AudioStreamFormat_js_1$1 = AudioStreamFormat;
 /**
@@ -19656,7 +19656,7 @@ AudioOutputFormatImpl.SpeechSynthesisOutputFormatToString = {
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(AudioOutputStream$1, "__esModule", { value: true });
-AudioOutputStream$1.PushAudioOutputStreamImpl = AudioOutputStream$1.PushAudioOutputStream = AudioOutputStream$1.PullAudioOutputStreamImpl = AudioOutputStream$1.PullAudioOutputStream = AudioOutputStream$1.AudioOutputStream = undefined;
+AudioOutputStream$1.PushAudioOutputStreamImpl = AudioOutputStream$1.PushAudioOutputStream = AudioOutputStream$1.PullAudioOutputStreamImpl = AudioOutputStream$1.PullAudioOutputStream = AudioOutputStream$1.AudioOutputStream = void 0;
 /* eslint-disable max-classes-per-file */
 const Exports_js_1$9 = requireExports$5();
 const Contracts_js_1$5 = Contracts$1;
@@ -19890,7 +19890,7 @@ function requireAudioConfig () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(AudioConfig, "__esModule", { value: true });
-	AudioConfig.AudioOutputConfigImpl = AudioConfig.AudioConfigImpl = AudioConfig.AudioConfig = undefined;
+	AudioConfig.AudioOutputConfigImpl = AudioConfig.AudioConfigImpl = AudioConfig.AudioConfig = void 0;
 	const Exports_js_1 = requireExports$2();
 	const Contracts_js_1 = Contracts$1;
 	const Exports_js_2 = requireExports$3();
@@ -20180,7 +20180,7 @@ var CancellationReason = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.CancellationReason = undefined;
+	exports.CancellationReason = void 0;
 	(function (CancellationReason) {
 	    /**
 	     * Indicates that an error occurred during speech recognition.
@@ -20200,7 +20200,7 @@ var CancellationReason = {};
 var PullAudioInputStreamCallback$1 = {};
 
 Object.defineProperty(PullAudioInputStreamCallback$1, "__esModule", { value: true });
-PullAudioInputStreamCallback$1.PullAudioInputStreamCallback = undefined;
+PullAudioInputStreamCallback$1.PullAudioInputStreamCallback = void 0;
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 /**
@@ -20215,7 +20215,7 @@ PullAudioInputStreamCallback$1.PullAudioInputStreamCallback = PullAudioInputStre
 var PushAudioOutputStreamCallback$1 = {};
 
 Object.defineProperty(PushAudioOutputStreamCallback$1, "__esModule", { value: true });
-PushAudioOutputStreamCallback$1.PushAudioOutputStreamCallback = undefined;
+PushAudioOutputStreamCallback$1.PushAudioOutputStreamCallback = void 0;
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 /**
@@ -20232,7 +20232,7 @@ var KeywordRecognitionModel$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(KeywordRecognitionModel$1, "__esModule", { value: true });
-KeywordRecognitionModel$1.KeywordRecognitionModel = undefined;
+KeywordRecognitionModel$1.KeywordRecognitionModel = void 0;
 const Contracts_js_1$4 = Contracts$1;
 /**
  * Represents a keyword recognition model for recognizing when
@@ -20295,7 +20295,7 @@ var SessionEventArgs$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(SessionEventArgs$1, "__esModule", { value: true });
-SessionEventArgs$1.SessionEventArgs = undefined;
+SessionEventArgs$1.SessionEventArgs = void 0;
 /**
  * Defines content for session events like SessionStarted/Stopped, SoundStarted/Stopped.
  * @class SessionEventArgs
@@ -20332,7 +20332,7 @@ function requireRecognitionEventArgs () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(RecognitionEventArgs, "__esModule", { value: true });
-	RecognitionEventArgs.RecognitionEventArgs = undefined;
+	RecognitionEventArgs.RecognitionEventArgs = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Defines payload for session events like Speech Start/End Detected
@@ -20371,7 +20371,7 @@ var OutputFormat = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.OutputFormat = undefined;
+	exports.OutputFormat = void 0;
 	(function (OutputFormat) {
 	    /**
 	     * @member OutputFormat.Simple
@@ -20396,7 +20396,7 @@ function requireIntentRecognitionEventArgs () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(IntentRecognitionEventArgs, "__esModule", { value: true });
-	IntentRecognitionEventArgs.IntentRecognitionEventArgs = undefined;
+	IntentRecognitionEventArgs.IntentRecognitionEventArgs = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Intent recognition result event arguments.
@@ -20436,7 +20436,7 @@ var RecognitionResult$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(RecognitionResult$1, "__esModule", { value: true });
-RecognitionResult$1.RecognitionResult = undefined;
+RecognitionResult$1.RecognitionResult = void 0;
 /**
  * Defines result of speech recognition.
  * @class RecognitionResult
@@ -20581,7 +20581,7 @@ function requireSpeechRecognitionResult () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeechRecognitionResult, "__esModule", { value: true });
-	SpeechRecognitionResult.SpeechRecognitionResult = undefined;
+	SpeechRecognitionResult.SpeechRecognitionResult = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Defines result of speech recognition.
@@ -20635,7 +20635,7 @@ function requireIntentRecognitionResult () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(IntentRecognitionResult, "__esModule", { value: true });
-	IntentRecognitionResult.IntentRecognitionResult = undefined;
+	IntentRecognitionResult.IntentRecognitionResult = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Intent recognition result.
@@ -20683,7 +20683,7 @@ var LanguageUnderstandingModel$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(LanguageUnderstandingModel$1, "__esModule", { value: true });
-LanguageUnderstandingModel$1.LanguageUnderstandingModelImpl = LanguageUnderstandingModel$1.LanguageUnderstandingModel = undefined;
+LanguageUnderstandingModel$1.LanguageUnderstandingModelImpl = LanguageUnderstandingModel$1.LanguageUnderstandingModel = void 0;
 // eslint-disable-next-line max-classes-per-file
 const Contracts_js_1$3 = Contracts$1;
 /**
@@ -20790,7 +20790,7 @@ function requireSpeechRecognitionEventArgs () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeechRecognitionEventArgs, "__esModule", { value: true });
-	SpeechRecognitionEventArgs.MeetingTranscriptionEventArgs = SpeechRecognitionEventArgs.ConversationTranscriptionEventArgs = SpeechRecognitionEventArgs.SpeechRecognitionEventArgs = undefined;
+	SpeechRecognitionEventArgs.MeetingTranscriptionEventArgs = SpeechRecognitionEventArgs.ConversationTranscriptionEventArgs = SpeechRecognitionEventArgs.SpeechRecognitionEventArgs = void 0;
 	/* eslint-disable max-classes-per-file */
 	const Exports_js_1 = requireExports$3();
 	/**
@@ -20873,7 +20873,7 @@ function requireCancellationEventArgsBase () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(CancellationEventArgsBase, "__esModule", { value: true });
-	CancellationEventArgsBase.CancellationEventArgsBase = undefined;
+	CancellationEventArgsBase.CancellationEventArgsBase = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Defines content of a CancellationEvent.
@@ -20936,7 +20936,7 @@ function requireSpeechRecognitionCanceledEventArgs () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeechRecognitionCanceledEventArgs, "__esModule", { value: true });
-	SpeechRecognitionCanceledEventArgs.SpeechRecognitionCanceledEventArgs = undefined;
+	SpeechRecognitionCanceledEventArgs.SpeechRecognitionCanceledEventArgs = void 0;
 	const CancellationEventArgsBase_js_1 = requireCancellationEventArgsBase();
 	let SpeechRecognitionCanceledEventArgs$1 = class SpeechRecognitionCanceledEventArgs extends CancellationEventArgsBase_js_1.CancellationEventArgsBase {
 	};
@@ -20956,7 +20956,7 @@ function requireTranslationRecognitionEventArgs () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(TranslationRecognitionEventArgs, "__esModule", { value: true });
-	TranslationRecognitionEventArgs.TranslationRecognitionEventArgs = undefined;
+	TranslationRecognitionEventArgs.TranslationRecognitionEventArgs = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Translation text result event arguments.
@@ -21001,7 +21001,7 @@ function requireTranslationSynthesisEventArgs () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(TranslationSynthesisEventArgs, "__esModule", { value: true });
-	TranslationSynthesisEventArgs.TranslationSynthesisEventArgs = undefined;
+	TranslationSynthesisEventArgs.TranslationSynthesisEventArgs = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Translation Synthesis event arguments
@@ -21045,7 +21045,7 @@ function requireTranslationRecognitionResult () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(TranslationRecognitionResult, "__esModule", { value: true });
-	TranslationRecognitionResult.TranslationRecognitionResult = undefined;
+	TranslationRecognitionResult.TranslationRecognitionResult = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Translation text result.
@@ -21099,7 +21099,7 @@ var TranslationSynthesisResult$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(TranslationSynthesisResult$1, "__esModule", { value: true });
-TranslationSynthesisResult$1.TranslationSynthesisResult = undefined;
+TranslationSynthesisResult$1.TranslationSynthesisResult = void 0;
 /**
  * Defines translation synthesis result, i.e. the voice output of the translated
  * text in the target language.
@@ -21145,7 +21145,7 @@ var ResultReason = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.ResultReason = undefined;
+	exports.ResultReason = void 0;
 	(function (ResultReason) {
 	    /**
 	     * Indicates speech could not be recognized. More details
@@ -21290,7 +21290,7 @@ function requireSpeechConfig () {
 	// Licensed under the MIT license.
 	/* eslint-disable max-classes-per-file */
 	Object.defineProperty(SpeechConfig, "__esModule", { value: true });
-	SpeechConfig.SpeechConfigImpl = SpeechConfig.SpeechConfig = undefined;
+	SpeechConfig.SpeechConfigImpl = SpeechConfig.SpeechConfig = void 0;
 	const Exports_js_1 = requireExports();
 	const Contracts_js_1 = Contracts$1;
 	const Exports_js_2 = requireExports$3();
@@ -21536,7 +21536,7 @@ function requireSpeechTranslationConfig () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeechTranslationConfig, "__esModule", { value: true });
-	SpeechTranslationConfig.SpeechTranslationConfigImpl = SpeechTranslationConfig.SpeechTranslationConfig = undefined;
+	SpeechTranslationConfig.SpeechTranslationConfigImpl = SpeechTranslationConfig.SpeechTranslationConfig = void 0;
 	/* eslint-disable max-classes-per-file */
 	const Exports_js_1 = requireExports();
 	const Contracts_js_1 = Contracts$1;
@@ -21896,7 +21896,7 @@ function requirePropertyCollection () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(PropertyCollection, "__esModule", { value: true });
-	PropertyCollection.PropertyCollection = undefined;
+	PropertyCollection.PropertyCollection = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Represents collection of properties and their values.
@@ -22015,7 +22015,7 @@ var PropertyId = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.PropertyId = undefined;
+	exports.PropertyId = void 0;
 	(function (PropertyId) {
 	    /**
 	     * The Cognitive Services Speech Service subscription Key. If you are using an intent recognizer, you need to
@@ -22487,7 +22487,7 @@ function requireRecognizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(Recognizer, "__esModule", { value: true });
-	Recognizer.Recognizer = undefined;
+	Recognizer.Recognizer = void 0;
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
 	const Contracts_js_1 = Contracts$1;
@@ -22641,7 +22641,7 @@ function requireSpeechRecognizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeechRecognizer, "__esModule", { value: true });
-	SpeechRecognizer.SpeechRecognizer = undefined;
+	SpeechRecognizer.SpeechRecognizer = void 0;
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
 	const Contracts_js_1 = Contracts$1;
@@ -22870,7 +22870,7 @@ function requireIntentRecognizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(IntentRecognizer, "__esModule", { value: true });
-	IntentRecognizer.IntentRecognizer = undefined;
+	IntentRecognizer.IntentRecognizer = void 0;
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
 	const Contracts_js_1 = Contracts$1;
@@ -23171,7 +23171,7 @@ var VoiceProfileType = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.VoiceProfileType = undefined;
+	exports.VoiceProfileType = void 0;
 	(function (VoiceProfileType) {
 	    /**
 	     * Text independent speaker identification
@@ -23209,7 +23209,7 @@ function requireConnectionMessage () {
 	// Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 	//
 	Object.defineProperty(ConnectionMessage, "__esModule", { value: true });
-	ConnectionMessage.ConnectionMessageImpl = ConnectionMessage.ConnectionMessage = undefined;
+	ConnectionMessage.ConnectionMessageImpl = ConnectionMessage.ConnectionMessage = void 0;
 	// eslint-disable-next-line max-classes-per-file
 	const HeaderNames_js_1 = HeaderNames$1;
 	const Exports_js_1 = requireExports$5();
@@ -23301,7 +23301,7 @@ function requireConnection () {
 	// Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 	//
 	Object.defineProperty(Connection, "__esModule", { value: true });
-	Connection.Connection = undefined;
+	Connection.Connection = void 0;
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
 	const ConnectionMessage_js_1 = requireConnectionMessage();
@@ -23457,7 +23457,7 @@ function requireTranslationRecognizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(TranslationRecognizer, "__esModule", { value: true });
-	TranslationRecognizer.TranslationRecognizer = undefined;
+	TranslationRecognizer.TranslationRecognizer = void 0;
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
 	const Connection_js_1 = requireConnection();
@@ -23708,7 +23708,7 @@ function requireTranslations () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(Translations, "__esModule", { value: true });
-	Translations.Translations = undefined;
+	Translations.Translations = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Represents collection of parameters and their values.
@@ -23767,7 +23767,7 @@ var NoMatchReason = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.NoMatchReason = undefined;
+	exports.NoMatchReason = void 0;
 	(function (NoMatchReason) {
 	    /**
 	     * Indicates that speech was detected, but not recognized.
@@ -23801,7 +23801,7 @@ function requireNoMatchDetails () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(NoMatchDetails, "__esModule", { value: true });
-	NoMatchDetails.NoMatchDetails = undefined;
+	NoMatchDetails.NoMatchDetails = void 0;
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$3();
 	/**
@@ -23864,7 +23864,7 @@ var TranslationRecognitionCanceledEventArgs$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(TranslationRecognitionCanceledEventArgs$1, "__esModule", { value: true });
-TranslationRecognitionCanceledEventArgs$1.TranslationRecognitionCanceledEventArgs = undefined;
+TranslationRecognitionCanceledEventArgs$1.TranslationRecognitionCanceledEventArgs = void 0;
 /**
  * Define payload of speech recognition canceled result events.
  * @class TranslationRecognitionCanceledEventArgs
@@ -23946,7 +23946,7 @@ function requireIntentRecognitionCanceledEventArgs () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(IntentRecognitionCanceledEventArgs, "__esModule", { value: true });
-	IntentRecognitionCanceledEventArgs.IntentRecognitionCanceledEventArgs = undefined;
+	IntentRecognitionCanceledEventArgs.IntentRecognitionCanceledEventArgs = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Define payload of intent recognition canceled result events.
@@ -24006,7 +24006,7 @@ var CancellationDetailsBase$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(CancellationDetailsBase$1, "__esModule", { value: true });
-CancellationDetailsBase$1.CancellationDetailsBase = undefined;
+CancellationDetailsBase$1.CancellationDetailsBase = void 0;
 /**
  * Contains detailed information about why a result was canceled.
  * @class CancellationDetailsBase
@@ -24064,7 +24064,7 @@ function requireCancellationDetails () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(CancellationDetails, "__esModule", { value: true });
-	CancellationDetails.CancellationDetails = undefined;
+	CancellationDetails.CancellationDetails = void 0;
 	const Exports_js_1 = requireExports();
 	const CancellationDetailsBase_js_1 = CancellationDetailsBase$1;
 	const Exports_js_2 = requireExports$3();
@@ -24109,7 +24109,7 @@ var CancellationErrorCodes = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.CancellationErrorCode = undefined;
+	exports.CancellationErrorCode = void 0;
 	(function (CancellationErrorCode) {
 	    /**
 	     * Indicates that no error occurred during speech recognition.
@@ -24165,7 +24165,7 @@ function requireConnectionEventArgs () {
 	// Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 	//
 	Object.defineProperty(ConnectionEventArgs, "__esModule", { value: true });
-	ConnectionEventArgs.ConnectionEventArgs = undefined;
+	ConnectionEventArgs.ConnectionEventArgs = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Defines payload for connection events like Connected/Disconnected.
@@ -24191,7 +24191,7 @@ function requireServiceEventArgs () {
 	// Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 	//
 	Object.defineProperty(ServiceEventArgs, "__esModule", { value: true });
-	ServiceEventArgs.ServiceEventArgs = undefined;
+	ServiceEventArgs.ServiceEventArgs = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Defines payload for any Service message event
@@ -24226,7 +24226,7 @@ var PhraseListGrammar$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(PhraseListGrammar$1, "__esModule", { value: true });
-PhraseListGrammar$1.PhraseListGrammar = undefined;
+PhraseListGrammar$1.PhraseListGrammar = void 0;
 /**
  * Allows additions of new phrases to improve speech recognition.
  *
@@ -24278,7 +24278,7 @@ function requireDialogServiceConfig () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(DialogServiceConfig, "__esModule", { value: true });
-	DialogServiceConfig.DialogServiceConfigImpl = DialogServiceConfig.DialogServiceConfig = undefined;
+	DialogServiceConfig.DialogServiceConfigImpl = DialogServiceConfig.DialogServiceConfig = void 0;
 	/* eslint-disable max-classes-per-file */
 	const Contracts_js_1 = Contracts$1;
 	const Exports_js_1 = requireExports$3();
@@ -24430,7 +24430,7 @@ function requireBotFrameworkConfig () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(BotFrameworkConfig, "__esModule", { value: true });
-	BotFrameworkConfig.BotFrameworkConfig = undefined;
+	BotFrameworkConfig.BotFrameworkConfig = void 0;
 	const Contracts_js_1 = Contracts$1;
 	const DialogServiceConfig_js_1 = requireDialogServiceConfig();
 	const Exports_js_1 = requireExports$3();
@@ -24573,7 +24573,7 @@ function requireCustomCommandsConfig () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(CustomCommandsConfig, "__esModule", { value: true });
-	CustomCommandsConfig.CustomCommandsConfig = undefined;
+	CustomCommandsConfig.CustomCommandsConfig = void 0;
 	const Contracts_js_1 = Contracts$1;
 	const DialogServiceConfig_js_1 = requireDialogServiceConfig();
 	const Exports_js_1 = requireExports$3();
@@ -24674,7 +24674,7 @@ var QueryParameterNames$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(QueryParameterNames$1, "__esModule", { value: true });
-QueryParameterNames$1.QueryParameterNames = undefined;
+QueryParameterNames$1.QueryParameterNames = void 0;
 class QueryParameterNames {
 }
 QueryParameterNames$1.QueryParameterNames = QueryParameterNames;
@@ -24710,7 +24710,7 @@ function requireConnectionFactoryBase () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(ConnectionFactoryBase, "__esModule", { value: true });
-	ConnectionFactoryBase.ConnectionFactoryBase = undefined;
+	ConnectionFactoryBase.ConnectionFactoryBase = void 0;
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$3();
 	const QueryParameterNames_js_1 = QueryParameterNames$1;
@@ -24768,7 +24768,7 @@ function requireDialogConnectorFactory () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(DialogConnectorFactory, "__esModule", { value: true });
-	DialogConnectorFactory.DialogConnectionFactory = undefined;
+	DialogConnectorFactory.DialogConnectionFactory = void 0;
 	/* eslint-disable max-classes-per-file */
 	const Exports_js_1 = requireExports$2();
 	const Exports_js_2 = requireExports();
@@ -24836,7 +24836,7 @@ function requireDialogServiceConnector () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(DialogServiceConnector, "__esModule", { value: true });
-	DialogServiceConnector.DialogServiceConnector = undefined;
+	DialogServiceConnector.DialogServiceConnector = void 0;
 	const DialogConnectorFactory_js_1 = requireDialogConnectorFactory();
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
@@ -25021,7 +25021,7 @@ var ActivityReceivedEventArgs$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(ActivityReceivedEventArgs$1, "__esModule", { value: true });
-ActivityReceivedEventArgs$1.ActivityReceivedEventArgs = undefined;
+ActivityReceivedEventArgs$1.ActivityReceivedEventArgs = void 0;
 /**
  * Defines contents of received message/events.
  * @class ActivityReceivedEventArgs
@@ -25059,7 +25059,7 @@ var TurnStatusPayload = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(TurnStatusPayload, "__esModule", { value: true });
-TurnStatusPayload.TurnStatusResponsePayload = undefined;
+TurnStatusPayload.TurnStatusResponsePayload = void 0;
 class TurnStatusResponsePayload {
     constructor(json) {
         this.privMessageStatusResponse = JSON.parse(json);
@@ -25094,7 +25094,7 @@ TurnStatusPayload.TurnStatusResponsePayload = TurnStatusResponsePayload;
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(TurnStatusReceivedEventArgs$1, "__esModule", { value: true });
-TurnStatusReceivedEventArgs$1.TurnStatusReceivedEventArgs = undefined;
+TurnStatusReceivedEventArgs$1.TurnStatusReceivedEventArgs = void 0;
 const TurnStatusPayload_js_1 = TurnStatusPayload;
 /**
  * Defines contents of received message/events.
@@ -25148,7 +25148,7 @@ var ServicePropertyChannel = {};
 	// Copyright (c) Microsoft Corporation.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.ServicePropertyChannel = undefined;
+	exports.ServicePropertyChannel = void 0;
 	(function (ServicePropertyChannel) {
 	    /**
 	     * Uses URI query parameter to pass property settings to service.
@@ -25165,7 +25165,7 @@ var ProfanityOption = {};
 	// Copyright (c) Microsoft Corporation.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.ProfanityOption = undefined;
+	exports.ProfanityOption = void 0;
 	(function (ProfanityOption) {
 	    ProfanityOption[ProfanityOption["Masked"] = 0] = "Masked";
 	    ProfanityOption[ProfanityOption["Removed"] = 1] = "Removed";
@@ -25185,7 +25185,7 @@ function requireBaseAudioPlayer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(BaseAudioPlayer, "__esModule", { value: true });
-	BaseAudioPlayer.BaseAudioPlayer = undefined;
+	BaseAudioPlayer.BaseAudioPlayer = void 0;
 	const Error_js_1 = _Error;
 	const Exports_js_1 = requireExports$3();
 	const AudioStreamFormat_js_1 = AudioStreamFormat;
@@ -25347,7 +25347,7 @@ var ConnectionMessageEventArgs$1 = {};
 // Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 //
 Object.defineProperty(ConnectionMessageEventArgs$1, "__esModule", { value: true });
-ConnectionMessageEventArgs$1.ConnectionMessageEventArgs = undefined;
+ConnectionMessageEventArgs$1.ConnectionMessageEventArgs = void 0;
 class ConnectionMessageEventArgs {
     constructor(message) {
         this.privConnectionMessage = message;
@@ -25372,7 +25372,7 @@ var VoiceProfile$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(VoiceProfile$1, "__esModule", { value: true });
-VoiceProfile$1.VoiceProfile = undefined;
+VoiceProfile$1.VoiceProfile = void 0;
 /**
  * Defines Voice Profile class for Speaker Recognition
  * @class VoiceProfile
@@ -25421,7 +25421,7 @@ function requireVoiceProfileEnrollmentResult () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(VoiceProfileEnrollmentResult, "__esModule", { value: true });
-	VoiceProfileEnrollmentResult.VoiceProfileEnrollmentCancellationDetails = VoiceProfileEnrollmentResult.VoiceProfileEnrollmentResult = undefined;
+	VoiceProfileEnrollmentResult.VoiceProfileEnrollmentCancellationDetails = VoiceProfileEnrollmentResult.VoiceProfileEnrollmentResult = void 0;
 	/* eslint-disable max-classes-per-file */
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$3();
@@ -25555,7 +25555,7 @@ function requireVoiceProfileResult () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(VoiceProfileResult, "__esModule", { value: true });
-	VoiceProfileResult.VoiceProfileCancellationDetails = VoiceProfileResult.VoiceProfileResult = undefined;
+	VoiceProfileResult.VoiceProfileCancellationDetails = VoiceProfileResult.VoiceProfileResult = void 0;
 	/* eslint-disable max-classes-per-file */
 	const Exports_js_1 = requireExports();
 	const Contracts_js_1 = Contracts$1;
@@ -25625,7 +25625,7 @@ function requireVoiceProfilePhraseResult () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(VoiceProfilePhraseResult, "__esModule", { value: true });
-	VoiceProfilePhraseResult.VoiceProfilePhraseResult = undefined;
+	VoiceProfilePhraseResult.VoiceProfilePhraseResult = void 0;
 	const Contracts_js_1 = Contracts$1;
 	const Exports_js_1 = requireExports$3();
 	/**
@@ -25665,7 +25665,7 @@ function requireVoiceProfileClient () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(VoiceProfileClient, "__esModule", { value: true });
-	VoiceProfileClient.VoiceProfileClient = undefined;
+	VoiceProfileClient.VoiceProfileClient = void 0;
 	const Exports_js_1 = requireExports();
 	const AudioConfig_js_1 = requireAudioConfig();
 	const Contracts_js_1 = Contracts$1;
@@ -25866,7 +25866,7 @@ function requireSpeakerRecognizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeakerRecognizer, "__esModule", { value: true });
-	SpeakerRecognizer.SpeakerRecognizer = undefined;
+	SpeakerRecognizer.SpeakerRecognizer = void 0;
 	const Exports_js_1 = requireExports();
 	const Contracts_js_1 = Contracts$1;
 	const Exports_js_2 = requireExports$3();
@@ -25994,7 +25994,7 @@ function requireSpeakerIdentificationModel () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeakerIdentificationModel, "__esModule", { value: true });
-	SpeakerIdentificationModel.SpeakerIdentificationModel = undefined;
+	SpeakerIdentificationModel.SpeakerIdentificationModel = void 0;
 	const Contracts_js_1 = Contracts$1;
 	const Exports_js_1 = requireExports$3();
 	/**
@@ -26047,7 +26047,7 @@ function requireSpeakerVerificationModel () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeakerVerificationModel, "__esModule", { value: true });
-	SpeakerVerificationModel.SpeakerVerificationModel = undefined;
+	SpeakerVerificationModel.SpeakerVerificationModel = void 0;
 	const Contracts_js_1 = Contracts$1;
 	const Exports_js_1 = requireExports$3();
 	/**
@@ -26095,7 +26095,7 @@ var LanguageIdMode = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.LanguageIdMode = undefined;
+	exports.LanguageIdMode = void 0;
 	(function (LanguageIdMode) {
 	    /**
 	     * Detect language at audio start
@@ -26120,7 +26120,7 @@ function requireAutoDetectSourceLanguageConfig () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(AutoDetectSourceLanguageConfig, "__esModule", { value: true });
-	AutoDetectSourceLanguageConfig.AutoDetectSourceLanguageConfig = undefined;
+	AutoDetectSourceLanguageConfig.AutoDetectSourceLanguageConfig = void 0;
 	const Exports_js_1 = requireExports();
 	const Contracts_js_1 = Contracts$1;
 	const Exports_js_2 = requireExports$3();
@@ -26228,7 +26228,7 @@ var AutoDetectSourceLanguageResult$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(AutoDetectSourceLanguageResult$1, "__esModule", { value: true });
-AutoDetectSourceLanguageResult$1.AutoDetectSourceLanguageResult = undefined;
+AutoDetectSourceLanguageResult$1.AutoDetectSourceLanguageResult = void 0;
 const Contracts_js_1$2 = Contracts$1;
 /**
  * Output format
@@ -26277,7 +26277,7 @@ var SourceLanguageConfig$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(SourceLanguageConfig$1, "__esModule", { value: true });
-SourceLanguageConfig$1.SourceLanguageConfig = undefined;
+SourceLanguageConfig$1.SourceLanguageConfig = void 0;
 const Contracts_js_1$1 = Contracts$1;
 /**
  * Source Language configuration.
@@ -26322,7 +26322,7 @@ function requireSpeakerRecognitionResult () {
 		// Copyright (c) Microsoft Corporation. All rights reserved.
 		// Licensed under the MIT license.
 		Object.defineProperty(exports, "__esModule", { value: true });
-		exports.SpeakerRecognitionCancellationDetails = exports.SpeakerRecognitionResult = exports.SpeakerRecognitionResultType = undefined;
+		exports.SpeakerRecognitionCancellationDetails = exports.SpeakerRecognitionResult = exports.SpeakerRecognitionResultType = void 0;
 		/* eslint-disable max-classes-per-file */
 		const Exports_js_1 = requireExports();
 		const Exports_js_2 = requireExports$3();
@@ -26423,7 +26423,7 @@ function requireConversation () {
 	// Licensed under the MIT license.
 	// Multi-device Conversation is a Preview feature.
 	Object.defineProperty(Conversation, "__esModule", { value: true });
-	Conversation.ConversationImpl = Conversation.Conversation = undefined;
+	Conversation.ConversationImpl = Conversation.Conversation = void 0;
 	/* eslint-disable max-classes-per-file */
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
@@ -27424,7 +27424,7 @@ var ConversationCommon$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(ConversationCommon$1, "__esModule", { value: true });
-ConversationCommon$1.ConversationCommon = undefined;
+ConversationCommon$1.ConversationCommon = void 0;
 class ConversationCommon {
     constructor(audioConfig) {
         this.privAudioConfig = audioConfig;
@@ -27467,7 +27467,7 @@ function requireConversationExpirationEventArgs () {
 	// Licensed under the MIT license.
 	// Multi-device Conversation is a Preview feature.
 	Object.defineProperty(ConversationExpirationEventArgs, "__esModule", { value: true });
-	ConversationExpirationEventArgs.ConversationExpirationEventArgs = undefined;
+	ConversationExpirationEventArgs.ConversationExpirationEventArgs = void 0;
 	const Exports_js_1 = requireExports$3();
 	let ConversationExpirationEventArgs$1 = class ConversationExpirationEventArgs extends Exports_js_1.SessionEventArgs {
 	    constructor(expirationTime, sessionId) {
@@ -27496,7 +27496,7 @@ function requireConversationParticipantsChangedEventArgs () {
 	// Licensed under the MIT license.
 	// Multi-device Conversation is a Preview feature.
 	Object.defineProperty(ConversationParticipantsChangedEventArgs, "__esModule", { value: true });
-	ConversationParticipantsChangedEventArgs.ConversationParticipantsChangedEventArgs = undefined;
+	ConversationParticipantsChangedEventArgs.ConversationParticipantsChangedEventArgs = void 0;
 	const Exports_js_1 = requireExports$3();
 	let ConversationParticipantsChangedEventArgs$1 = class ConversationParticipantsChangedEventArgs extends Exports_js_1.SessionEventArgs {
 	    constructor(reason, participants, sessionId) {
@@ -27528,7 +27528,7 @@ function requireConversationTranslationCanceledEventArgs () {
 	// Licensed under the MIT license.
 	// Multi-device Conversation is a Preview feature.
 	Object.defineProperty(ConversationTranslationCanceledEventArgs, "__esModule", { value: true });
-	ConversationTranslationCanceledEventArgs.ConversationTranslationCanceledEventArgs = undefined;
+	ConversationTranslationCanceledEventArgs.ConversationTranslationCanceledEventArgs = void 0;
 	const CancellationEventArgsBase_js_1 = requireCancellationEventArgsBase();
 	let ConversationTranslationCanceledEventArgs$1 = class ConversationTranslationCanceledEventArgs extends CancellationEventArgsBase_js_1.CancellationEventArgsBase {
 	};
@@ -27549,7 +27549,7 @@ function requireConversationTranslationEventArgs () {
 	// Licensed under the MIT license.
 	// Multi-device Conversation is a Preview feature.
 	Object.defineProperty(ConversationTranslationEventArgs, "__esModule", { value: true });
-	ConversationTranslationEventArgs.ConversationTranslationEventArgs = undefined;
+	ConversationTranslationEventArgs.ConversationTranslationEventArgs = void 0;
 	const Exports_js_1 = requireExports$3();
 	let ConversationTranslationEventArgs$1 = class ConversationTranslationEventArgs extends Exports_js_1.RecognitionEventArgs {
 	    /**
@@ -27588,7 +27588,7 @@ function requireConversationTranslationResult () {
 	// Licensed under the MIT license.
 	// Multi-device Conversation is a Preview feature.
 	Object.defineProperty(ConversationTranslationResult, "__esModule", { value: true });
-	ConversationTranslationResult.ConversationTranslationResult = undefined;
+	ConversationTranslationResult.ConversationTranslationResult = void 0;
 	const TranslationRecognitionResult_js_1 = requireTranslationRecognitionResult();
 	let ConversationTranslationResult$1 = class ConversationTranslationResult extends TranslationRecognitionResult_js_1.TranslationRecognitionResult {
 	    constructor(participantId, translations, originalLanguage, resultId, reason, text, duration, offset, errorDetails, json, properties) {
@@ -27624,7 +27624,7 @@ var StringUtils$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(StringUtils$1, "__esModule", { value: true });
-StringUtils$1.StringUtils = undefined;
+StringUtils$1.StringUtils = void 0;
 /**
  * String helper functions
  */
@@ -27696,7 +27696,7 @@ function requireConversationTranslatorConnectionFactory () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(ConversationTranslatorConnectionFactory, "__esModule", { value: true });
-	ConversationTranslatorConnectionFactory.ConversationTranslatorConnectionFactory = undefined;
+	ConversationTranslatorConnectionFactory.ConversationTranslatorConnectionFactory = void 0;
 	const Exports_js_1 = requireExports$2();
 	const StringUtils_js_1 = StringUtils$1;
 	const Contracts_js_1 = Contracts$1;
@@ -27795,7 +27795,7 @@ function requireConversationTranslator () {
 		// Licensed under the MIT license.
 		// Multi-device Conversation is a Preview feature.
 		Object.defineProperty(exports, "__esModule", { value: true });
-		exports.ConversationTranslator = exports.SpeechState = undefined;
+		exports.ConversationTranslator = exports.SpeechState = void 0;
 		/* eslint-disable max-classes-per-file */
 		const Exports_js_1 = requireExports();
 		const ConversationTranslatorConnectionFactory_js_1 = requireConversationTranslatorConnectionFactory();
@@ -28190,7 +28190,7 @@ function requireConversationTranscriber () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(ConversationTranscriber, "__esModule", { value: true });
-	ConversationTranscriber.ConversationTranscriber = undefined;
+	ConversationTranscriber.ConversationTranscriber = void 0;
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
 	const Contracts_js_1 = Contracts$1;
@@ -28372,7 +28372,7 @@ function requireIParticipant () {
 	// Licensed under the MIT license.
 	// Multi-device Conversation is a Preview feature.
 	Object.defineProperty(IParticipant, "__esModule", { value: true });
-	IParticipant.Participant = IParticipant.User = undefined;
+	IParticipant.Participant = IParticipant.User = void 0;
 	/* eslint-disable max-classes-per-file */
 	const Exports_js_1 = requireExports$3();
 	class User {
@@ -28440,7 +28440,7 @@ var ParticipantChangedReason = {};
 	// Licensed under the MIT license.
 	// Multi-device Conversation is a Preview feature.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.ParticipantChangedReason = undefined;
+	exports.ParticipantChangedReason = void 0;
 	(function (ParticipantChangedReason) {
 	    /** Participant has joined the conversation. */
 	    ParticipantChangedReason[ParticipantChangedReason["JoinedConversation"] = 0] = "JoinedConversation";
@@ -28466,7 +28466,7 @@ function requireMeeting () {
 	// Licensed under the MIT license.
 	// Multi-device Conversation is a Preview feature.
 	Object.defineProperty(Meeting, "__esModule", { value: true });
-	Meeting.MeetingImpl = Meeting.Meeting = undefined;
+	Meeting.MeetingImpl = Meeting.Meeting = void 0;
 	/* eslint-disable max-classes-per-file */
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
@@ -29429,7 +29429,7 @@ function requireMeetingTranscriptionCanceledEventArgs$1 () {
 	// Licensed under the MIT license.
 	// Multi-device Conversation is a Preview feature.
 	Object.defineProperty(MeetingTranscriptionCanceledEventArgs$1, "__esModule", { value: true });
-	MeetingTranscriptionCanceledEventArgs$1.MeetingTranscriptionCanceledEventArgs = undefined;
+	MeetingTranscriptionCanceledEventArgs$1.MeetingTranscriptionCanceledEventArgs = void 0;
 	const CancellationEventArgsBase_js_1 = requireCancellationEventArgsBase();
 	class MeetingTranscriptionCanceledEventArgs extends CancellationEventArgsBase_js_1.CancellationEventArgsBase {
 	}
@@ -29449,7 +29449,7 @@ function requireMeetingTranscriber () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(MeetingTranscriber, "__esModule", { value: true });
-	MeetingTranscriber.MeetingTranscriber = undefined;
+	MeetingTranscriber.MeetingTranscriber = void 0;
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
 	const Contracts_js_1 = Contracts$1;
@@ -29619,7 +29619,7 @@ function requireConversationTranscriptionResult () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(ConversationTranscriptionResult, "__esModule", { value: true });
-	ConversationTranscriptionResult.ConversationTranscriptionResult = undefined;
+	ConversationTranscriptionResult.ConversationTranscriptionResult = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Defines result of conversation transcription.
@@ -29722,7 +29722,7 @@ function requireSynthesizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(Synthesizer, "__esModule", { value: true });
-	Synthesizer.SynthesisRequest = Synthesizer.Synthesizer = undefined;
+	Synthesizer.SynthesisRequest = Synthesizer.Synthesizer = void 0;
 	/* eslint-disable max-classes-per-file */
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
@@ -30020,7 +30020,7 @@ function requireSpeechSynthesizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeechSynthesizer, "__esModule", { value: true });
-	SpeechSynthesizer.SpeechSynthesizer = undefined;
+	SpeechSynthesizer.SpeechSynthesizer = void 0;
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
 	const AudioFileWriter_js_1 = AudioFileWriter$1;
@@ -30221,7 +30221,7 @@ var SynthesisResult$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(SynthesisResult$1, "__esModule", { value: true });
-SynthesisResult$1.SynthesisResult = undefined;
+SynthesisResult$1.SynthesisResult = void 0;
 /**
  * Base class for synthesis results
  * @class SynthesisResult
@@ -30295,7 +30295,7 @@ function requireSpeechSynthesisResult () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeechSynthesisResult, "__esModule", { value: true });
-	SpeechSynthesisResult.SpeechSynthesisResult = undefined;
+	SpeechSynthesisResult.SpeechSynthesisResult = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Defines result of speech synthesis.
@@ -30350,7 +30350,7 @@ var SpeechSynthesisEventArgs$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(SpeechSynthesisEventArgs$1, "__esModule", { value: true });
-SpeechSynthesisEventArgs$1.SpeechSynthesisEventArgs = undefined;
+SpeechSynthesisEventArgs$1.SpeechSynthesisEventArgs = void 0;
 /**
  * Defines contents of speech synthesis events.
  * @class SpeechSynthesisEventArgs
@@ -30383,7 +30383,7 @@ var SpeechSynthesisWordBoundaryEventArgs$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(SpeechSynthesisWordBoundaryEventArgs$1, "__esModule", { value: true });
-SpeechSynthesisWordBoundaryEventArgs$1.SpeechSynthesisWordBoundaryEventArgs = undefined;
+SpeechSynthesisWordBoundaryEventArgs$1.SpeechSynthesisWordBoundaryEventArgs = void 0;
 /**
  * Defines contents of speech synthesis word boundary event.
  * @class SpeechSynthesisWordBoundaryEventArgs
@@ -30476,7 +30476,7 @@ var SpeechSynthesisBookmarkEventArgs$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(SpeechSynthesisBookmarkEventArgs$1, "__esModule", { value: true });
-SpeechSynthesisBookmarkEventArgs$1.SpeechSynthesisBookmarkEventArgs = undefined;
+SpeechSynthesisBookmarkEventArgs$1.SpeechSynthesisBookmarkEventArgs = void 0;
 /**
  * Defines contents of speech synthesis bookmark event.
  * @class SpeechSynthesisBookmarkEventArgs
@@ -30521,7 +30521,7 @@ var SpeechSynthesisVisemeEventArgs$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(SpeechSynthesisVisemeEventArgs$1, "__esModule", { value: true });
-SpeechSynthesisVisemeEventArgs$1.SpeechSynthesisVisemeEventArgs = undefined;
+SpeechSynthesisVisemeEventArgs$1.SpeechSynthesisVisemeEventArgs = void 0;
 /**
  * Defines contents of speech synthesis viseme event.
  * @class SpeechSynthesisVisemeEventArgs
@@ -30579,7 +30579,7 @@ var SpeechSynthesisBoundaryType = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.SpeechSynthesisBoundaryType = undefined;
+	exports.SpeechSynthesisBoundaryType = void 0;
 	(function (SpeechSynthesisBoundaryType) {
 	    /**
 	     * Indicates the boundary text is a word.
@@ -30611,7 +30611,7 @@ function requireSynthesisVoicesResult () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SynthesisVoicesResult, "__esModule", { value: true });
-	SynthesisVoicesResult.SynthesisVoicesResult = undefined;
+	SynthesisVoicesResult.SynthesisVoicesResult = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Defines result of speech synthesis.
@@ -30660,7 +30660,7 @@ var VoiceInfo = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.VoiceInfo = exports.SynthesisVoiceType = exports.SynthesisVoiceGender = undefined;
+	exports.VoiceInfo = exports.SynthesisVoiceType = exports.SynthesisVoiceGender = void 0;
 	/**
 	 * Defines the gender of synthesis voices.
 	 * Added in version 1.20.0.
@@ -30782,7 +30782,7 @@ var SpeakerAudioDestination$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(SpeakerAudioDestination$1, "__esModule", { value: true });
-SpeakerAudioDestination$1.SpeakerAudioDestination = undefined;
+SpeakerAudioDestination$1.SpeakerAudioDestination = void 0;
 const Exports_js_1$8 = requireExports$5();
 const AudioOutputStream_js_1$1 = AudioOutputStream$1;
 const AudioStreamFormat_js_1 = AudioStreamFormat;
@@ -31044,7 +31044,7 @@ function requireConversationTranscriptionCanceledEventArgs () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(ConversationTranscriptionCanceledEventArgs, "__esModule", { value: true });
-	ConversationTranscriptionCanceledEventArgs.ConversationTranscriptionCanceledEventArgs = undefined;
+	ConversationTranscriptionCanceledEventArgs.ConversationTranscriptionCanceledEventArgs = void 0;
 	const CancellationEventArgsBase_js_1 = requireCancellationEventArgsBase();
 	/**
 	 * Defines content of a RecognitionErrorEvent.
@@ -31068,7 +31068,7 @@ function requireMeetingTranscriptionCanceledEventArgs () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(MeetingTranscriptionCanceledEventArgs, "__esModule", { value: true });
-	MeetingTranscriptionCanceledEventArgs.MeetingTranscriptionCanceledEventArgs = undefined;
+	MeetingTranscriptionCanceledEventArgs.MeetingTranscriptionCanceledEventArgs = void 0;
 	const CancellationEventArgsBase_js_1 = requireCancellationEventArgsBase();
 	/**
 	 * Defines content of a MeetingTranscriptionCanceledEvent.
@@ -31088,7 +31088,7 @@ var PronunciationAssessmentGradingSystem = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.PronunciationAssessmentGradingSystem = undefined;
+	exports.PronunciationAssessmentGradingSystem = void 0;
 	(function (PronunciationAssessmentGradingSystem) {
 	    /**
 	     * Five point calibration
@@ -31111,7 +31111,7 @@ var PronunciationAssessmentGranularity = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.PronunciationAssessmentGranularity = undefined;
+	exports.PronunciationAssessmentGranularity = void 0;
 	(function (PronunciationAssessmentGranularity) {
 	    /**
 	     * Shows the score on the full text, word and phoneme level
@@ -31143,7 +31143,7 @@ function requirePronunciationAssessmentConfig () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(PronunciationAssessmentConfig, "__esModule", { value: true });
-	PronunciationAssessmentConfig.PronunciationAssessmentConfig = undefined;
+	PronunciationAssessmentConfig.PronunciationAssessmentConfig = void 0;
 	const Contracts_js_1 = Contracts$1;
 	const Exports_js_1 = requireExports$3();
 	/**
@@ -31343,7 +31343,7 @@ function requirePronunciationAssessmentResult () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(PronunciationAssessmentResult, "__esModule", { value: true });
-	PronunciationAssessmentResult.PronunciationAssessmentResult = PronunciationAssessmentResult.ContentAssessmentResult = undefined;
+	PronunciationAssessmentResult.PronunciationAssessmentResult = PronunciationAssessmentResult.ContentAssessmentResult = void 0;
 	/* eslint-disable max-classes-per-file */
 	const Contracts_js_1 = Contracts$1;
 	const Exports_js_1 = requireExports$3();
@@ -31511,7 +31511,7 @@ function requireAvatarConfig () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(AvatarConfig, "__esModule", { value: true });
-	AvatarConfig.AvatarConfig = undefined;
+	AvatarConfig.AvatarConfig = void 0;
 	const Contracts_js_1 = Contracts$1;
 	const Exports_js_1 = requireExports$3();
 	/**
@@ -31607,7 +31607,7 @@ var AvatarEventArgs = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.AvatarEventArgs = exports.AvatarEventTypes = undefined;
+	exports.AvatarEventArgs = exports.AvatarEventTypes = void 0;
 	(function (AvatarEventTypes) {
 	    AvatarEventTypes["SwitchedToSpeaking"] = "SwitchedToSpeaking";
 	    AvatarEventTypes["SwitchedToIdle"] = "SwitchedToIdle";
@@ -31673,7 +31673,7 @@ function requireSpeechSynthesisConnectionFactory () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeechSynthesisConnectionFactory, "__esModule", { value: true });
-	SpeechSynthesisConnectionFactory.SpeechSynthesisConnectionFactory = undefined;
+	SpeechSynthesisConnectionFactory.SpeechSynthesisConnectionFactory = void 0;
 	const Exports_js_1 = requireExports$2();
 	const Exports_js_2 = requireExports$3();
 	const ConnectionFactoryBase_js_1 = requireConnectionFactoryBase();
@@ -31729,7 +31729,7 @@ function requireAvatarSynthesizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(AvatarSynthesizer, "__esModule", { value: true });
-	AvatarSynthesizer.AvatarSynthesizer = undefined;
+	AvatarSynthesizer.AvatarSynthesizer = void 0;
 	const SpeechSynthesisConnectionFactory_js_1 = requireSpeechSynthesisConnectionFactory();
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
@@ -31921,7 +31921,7 @@ var AvatarVideoFormat$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(AvatarVideoFormat$1, "__esModule", { value: true });
-AvatarVideoFormat$1.AvatarVideoFormat = AvatarVideoFormat$1.Coordinate = undefined;
+AvatarVideoFormat$1.AvatarVideoFormat = AvatarVideoFormat$1.Coordinate = void 0;
 /* eslint-disable max-classes-per-file */
 /**
  * Defines a coordinate in 2D space.
@@ -31979,7 +31979,7 @@ function requireAvatarWebRTCConnectionResult () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(AvatarWebRTCConnectionResult, "__esModule", { value: true });
-	AvatarWebRTCConnectionResult.AvatarWebRTCConnectionResult = undefined;
+	AvatarWebRTCConnectionResult.AvatarWebRTCConnectionResult = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Defines the avatar WebRTC connection result.
@@ -32031,7 +32031,7 @@ function requireDiagnostics () {
 	// Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
 	//
 	Object.defineProperty(Diagnostics, "__esModule", { value: true });
-	Diagnostics.Diagnostics = undefined;
+	Diagnostics.Diagnostics = void 0;
 	const Exports_js_1 = requireExports$2();
 	const Exports_js_2 = requireExports$5();
 	/**
@@ -32316,7 +32316,7 @@ function requireProxyInfo () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(ProxyInfo, "__esModule", { value: true });
-	ProxyInfo.ProxyInfo = undefined;
+	ProxyInfo.ProxyInfo = void 0;
 	const Exports_js_1 = requireExports$3();
 	let ProxyInfo$1 = class ProxyInfo {
 	    constructor(proxyHostName, proxyPort, proxyUserName, proxyPassword) {
@@ -32484,7 +32484,7 @@ var browser = core(mkrequest);
 	    return (mod && mod.__esModule) ? mod : { "default": mod };
 	};
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.RestMessageAdapter = exports.RestRequestType = undefined;
+	exports.RestMessageAdapter = exports.RestRequestType = void 0;
 	const bent_1 = __importDefault(browser);
 	const Exports_js_1 = requireExports$5();
 	var RestRequestType;
@@ -32589,7 +32589,7 @@ var RestConfigBase$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(RestConfigBase$1, "__esModule", { value: true });
-RestConfigBase$1.RestConfigBase = undefined;
+RestConfigBase$1.RestConfigBase = void 0;
 class RestConfigBase {
     static get requestOptions() {
         return RestConfigBase.privDefaultRequestOptions;
@@ -32682,7 +32682,7 @@ function requireIntentConnectionFactory () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(IntentConnectionFactory, "__esModule", { value: true });
-	IntentConnectionFactory.IntentConnectionFactory = undefined;
+	IntentConnectionFactory.IntentConnectionFactory = void 0;
 	const Exports_js_1 = requireExports$2();
 	const Exports_js_2 = requireExports$3();
 	const ConnectionFactoryBase_js_1 = requireConnectionFactoryBase();
@@ -32782,7 +32782,7 @@ function requireSpeakerRecognitionConnectionFactory () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeakerRecognitionConnectionFactory, "__esModule", { value: true });
-	SpeakerRecognitionConnectionFactory.VoiceProfileConnectionFactory = SpeakerRecognitionConnectionFactory.SpeakerRecognitionConnectionFactory = undefined;
+	SpeakerRecognitionConnectionFactory.VoiceProfileConnectionFactory = SpeakerRecognitionConnectionFactory.SpeakerRecognitionConnectionFactory = void 0;
 	/* eslint-disable max-classes-per-file */
 	const Exports_js_1 = requireExports$2();
 	const Exports_js_2 = requireExports$3();
@@ -32851,7 +32851,7 @@ var RecognitionEvents = {};
 	// Licensed under the MIT license.
 	/* eslint-disable max-classes-per-file */
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.RecognitionEndedEvent = exports.RecognitionCompletionStatus = exports.RecognitionStartedEvent = exports.ConnectingToServiceEvent = exports.ListeningStartedEvent = exports.RecognitionTriggeredEvent = exports.SpeechRecognitionEvent = undefined;
+	exports.RecognitionEndedEvent = exports.RecognitionCompletionStatus = exports.RecognitionStartedEvent = exports.ConnectingToServiceEvent = exports.ListeningStartedEvent = exports.RecognitionTriggeredEvent = exports.SpeechRecognitionEvent = void 0;
 	const Exports_js_1 = requireExports$5();
 	class SpeechRecognitionEvent extends Exports_js_1.PlatformEvent {
 	    constructor(eventName, requestId, sessionId, eventType = Exports_js_1.EventType.Info) {
@@ -32977,7 +32977,7 @@ var SpeechConnectionMessage_Internal = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(SpeechConnectionMessage_Internal, "__esModule", { value: true });
-SpeechConnectionMessage_Internal.SpeechConnectionMessage = undefined;
+SpeechConnectionMessage_Internal.SpeechConnectionMessage = void 0;
 const Exports_js_1$7 = requireExports$5();
 const HeaderNames_js_1 = HeaderNames$1;
 class SpeechConnectionMessage extends Exports_js_1$7.ConnectionMessage {
@@ -33075,7 +33075,7 @@ function requireServiceRecognizerBase () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(ServiceRecognizerBase, "__esModule", { value: true });
-	ServiceRecognizerBase.ServiceRecognizerBase = undefined;
+	ServiceRecognizerBase.ServiceRecognizerBase = void 0;
 	const Exports_js_1 = requireExports$2();
 	const Exports_js_2 = requireExports$5();
 	const Exports_js_3 = requireExports$3();
@@ -33837,7 +33837,7 @@ function requireConversationServiceRecognizer () {
 	if (hasRequiredConversationServiceRecognizer) return ConversationServiceRecognizer;
 	hasRequiredConversationServiceRecognizer = 1;
 	Object.defineProperty(ConversationServiceRecognizer, "__esModule", { value: true });
-	ConversationServiceRecognizer.ConversationServiceRecognizer = undefined;
+	ConversationServiceRecognizer.ConversationServiceRecognizer = void 0;
 	const Exports_js_1 = requireExports$3();
 	const Exports_js_2 = requireExports();
 	let ConversationServiceRecognizer$1 = class ConversationServiceRecognizer extends Exports_js_2.ServiceRecognizerBase {
@@ -33927,7 +33927,7 @@ function requireRecognizerConfig () {
 		// Copyright (c) Microsoft Corporation. All rights reserved.
 		// Licensed under the MIT license.
 		Object.defineProperty(exports, "__esModule", { value: true });
-		exports.RecognizerConfig = exports.SpeechResultFormat = exports.RecognitionMode = undefined;
+		exports.RecognizerConfig = exports.SpeechResultFormat = exports.RecognitionMode = void 0;
 		/* eslint-disable max-classes-per-file */
 		const Exports_js_1 = requireExports$3();
 		const Exports_js_2 = requireExports();
@@ -34024,7 +34024,7 @@ var WebsocketMessageFormatter$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(WebsocketMessageFormatter$1, "__esModule", { value: true });
-WebsocketMessageFormatter$1.WebsocketMessageFormatter = undefined;
+WebsocketMessageFormatter$1.WebsocketMessageFormatter = void 0;
 const Exports_js_1$6 = requireExports$5();
 const CRLF = "\r\n";
 class WebsocketMessageFormatter {
@@ -34155,7 +34155,7 @@ function requireSpeechConnectionFactory () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeechConnectionFactory, "__esModule", { value: true });
-	SpeechConnectionFactory.SpeechConnectionFactory = undefined;
+	SpeechConnectionFactory.SpeechConnectionFactory = void 0;
 	const Exports_js_1 = requireExports$2();
 	const Exports_js_2 = requireExports();
 	const Exports_js_3 = requireExports$3();
@@ -34254,7 +34254,7 @@ function requireConversationTranscriberConnectionFactory () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(ConversationTranscriberConnectionFactory, "__esModule", { value: true });
-	ConversationTranscriberConnectionFactory.ConversationTranscriberConnectionFactory = undefined;
+	ConversationTranscriberConnectionFactory.ConversationTranscriberConnectionFactory = void 0;
 	const Exports_js_1 = requireExports$2();
 	const Exports_js_2 = requireExports$3();
 	const Exports_js_3 = requireExports();
@@ -34340,7 +34340,7 @@ function requireTranscriberConnectionFactory () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(TranscriberConnectionFactory, "__esModule", { value: true });
-	TranscriberConnectionFactory.TranscriberConnectionFactory = undefined;
+	TranscriberConnectionFactory.TranscriberConnectionFactory = void 0;
 	const Exports_js_1 = requireExports$2();
 	const Exports_js_2 = requireExports$3();
 	const ConnectionFactoryBase_js_1 = requireConnectionFactoryBase();
@@ -34405,7 +34405,7 @@ function requireTranslationConnectionFactory () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(TranslationConnectionFactory, "__esModule", { value: true });
-	TranslationConnectionFactory.TranslationConnectionFactory = undefined;
+	TranslationConnectionFactory.TranslationConnectionFactory = void 0;
 	const Exports_js_1 = requireExports$2();
 	const StringUtils_js_1 = StringUtils$1;
 	const Exports_js_2 = requireExports$3();
@@ -34479,7 +34479,7 @@ function requireEnumTranslation () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(EnumTranslation, "__esModule", { value: true });
-	EnumTranslation.EnumTranslation = undefined;
+	EnumTranslation.EnumTranslation = void 0;
 	const Exports_js_1 = requireExports$3();
 	const Exports_js_2 = requireExports();
 	let EnumTranslation$1 = class EnumTranslation {
@@ -34576,7 +34576,7 @@ var Enums = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.RecognitionStatus = exports.SynthesisStatus = undefined;
+	exports.RecognitionStatus = exports.SynthesisStatus = void 0;
 	(function (SynthesisStatus) {
 	    /**
 	     * The response contains valid audio data.
@@ -34619,7 +34619,7 @@ function requireTranslationSynthesisEnd () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(TranslationSynthesisEnd, "__esModule", { value: true });
-	TranslationSynthesisEnd.TranslationSynthesisEnd = undefined;
+	TranslationSynthesisEnd.TranslationSynthesisEnd = void 0;
 	const Exports_js_1 = requireExports();
 	let TranslationSynthesisEnd$1 = class TranslationSynthesisEnd {
 	    constructor(json) {
@@ -34652,7 +34652,7 @@ var TranslationHypothesis$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(TranslationHypothesis$1, "__esModule", { value: true });
-TranslationHypothesis$1.TranslationHypothesis = undefined;
+TranslationHypothesis$1.TranslationHypothesis = void 0;
 const Contracts_js_1 = Contracts$1;
 const TranslationStatus_js_1 = TranslationStatus;
 class TranslationHypothesis {
@@ -34715,7 +34715,7 @@ function requireTranslationPhrase () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(TranslationPhrase, "__esModule", { value: true });
-	TranslationPhrase.TranslationPhrase = undefined;
+	TranslationPhrase.TranslationPhrase = void 0;
 	const Contracts_js_1 = Contracts$1;
 	const Exports_js_1 = requireExports();
 	const TranslationStatus_js_1 = TranslationStatus;
@@ -34809,7 +34809,7 @@ function requireTranslationServiceRecognizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(TranslationServiceRecognizer, "__esModule", { value: true });
-	TranslationServiceRecognizer.TranslationServiceRecognizer = undefined;
+	TranslationServiceRecognizer.TranslationServiceRecognizer = void 0;
 	const Exports_js_1 = requireExports$5();
 	const Exports_js_2 = requireExports$3();
 	const Exports_js_3 = requireExports();
@@ -35090,7 +35090,7 @@ var SpeechDetected$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(SpeechDetected$1, "__esModule", { value: true });
-SpeechDetected$1.SpeechDetected = undefined;
+SpeechDetected$1.SpeechDetected = void 0;
 class SpeechDetected {
     constructor(json, baseOffset) {
         this.privSpeechStartDetected = JSON.parse(json);
@@ -35110,7 +35110,7 @@ var SpeechHypothesis$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(SpeechHypothesis$1, "__esModule", { value: true });
-SpeechHypothesis$1.SpeechHypothesis = undefined;
+SpeechHypothesis$1.SpeechHypothesis = void 0;
 class SpeechHypothesis {
     constructor(json, baseOffset) {
         this.privSpeechHypothesis = JSON.parse(json);
@@ -35151,7 +35151,7 @@ var SpeechKeyword$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(SpeechKeyword$1, "__esModule", { value: true });
-SpeechKeyword$1.SpeechKeyword = undefined;
+SpeechKeyword$1.SpeechKeyword = void 0;
 class SpeechKeyword {
     constructor(json, baseOffset) {
         this.privSpeechKeyword = JSON.parse(json);
@@ -35188,7 +35188,7 @@ function requireSpeechServiceRecognizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeechServiceRecognizer, "__esModule", { value: true });
-	SpeechServiceRecognizer.SpeechServiceRecognizer = undefined;
+	SpeechServiceRecognizer.SpeechServiceRecognizer = void 0;
 	const Exports_js_1 = requireExports$3();
 	const Exports_js_2 = requireExports();
 	// eslint-disable-next-line max-classes-per-file
@@ -35325,7 +35325,7 @@ function requireConversationTranscriptionServiceRecognizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(ConversationTranscriptionServiceRecognizer, "__esModule", { value: true });
-	ConversationTranscriptionServiceRecognizer.ConversationTranscriptionServiceRecognizer = undefined;
+	ConversationTranscriptionServiceRecognizer.ConversationTranscriptionServiceRecognizer = void 0;
 	const Exports_js_1 = requireExports$3();
 	const Exports_js_2 = requireExports();
 	// eslint-disable-next-line max-classes-per-file
@@ -35438,7 +35438,7 @@ function requireTranscriptionServiceRecognizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(TranscriptionServiceRecognizer, "__esModule", { value: true });
-	TranscriptionServiceRecognizer.TranscriptionServiceRecognizer = undefined;
+	TranscriptionServiceRecognizer.TranscriptionServiceRecognizer = void 0;
 	const Exports_js_1 = requireExports$5();
 	const Exports_js_2 = requireExports$3();
 	const Exports_js_3 = requireExports();
@@ -35598,7 +35598,7 @@ function requireDetailedSpeechPhrase () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(DetailedSpeechPhrase, "__esModule", { value: true });
-	DetailedSpeechPhrase.DetailedSpeechPhrase = undefined;
+	DetailedSpeechPhrase.DetailedSpeechPhrase = void 0;
 	const Exports_js_1 = requireExports();
 	let DetailedSpeechPhrase$1 = class DetailedSpeechPhrase {
 	    constructor(json, baseOffset) {
@@ -35686,7 +35686,7 @@ function requireSimpleSpeechPhrase () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SimpleSpeechPhrase, "__esModule", { value: true });
-	SimpleSpeechPhrase.SimpleSpeechPhrase = undefined;
+	SimpleSpeechPhrase.SimpleSpeechPhrase = void 0;
 	const Exports_js_1 = requireExports();
 	let SimpleSpeechPhrase$1 = class SimpleSpeechPhrase {
 	    constructor(json, baseOffset = 0) {
@@ -35749,7 +35749,7 @@ var AddedLmIntent$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(AddedLmIntent$1, "__esModule", { value: true });
-AddedLmIntent$1.AddedLmIntent = undefined;
+AddedLmIntent$1.AddedLmIntent = void 0;
 /**
  * @class AddedLmIntent
  */
@@ -35778,7 +35778,7 @@ function requireIntentServiceRecognizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(IntentServiceRecognizer, "__esModule", { value: true });
-	IntentServiceRecognizer.IntentServiceRecognizer = undefined;
+	IntentServiceRecognizer.IntentServiceRecognizer = void 0;
 	const Exports_js_1 = requireExports$5();
 	const Exports_js_2 = requireExports$3();
 	const Exports_js_3 = requireExports();
@@ -35977,7 +35977,7 @@ var IntentResponse$1 = {};
 // Licensed under the MIT license.
 // response
 Object.defineProperty(IntentResponse$1, "__esModule", { value: true });
-IntentResponse$1.IntentResponse = undefined;
+IntentResponse$1.IntentResponse = void 0;
 class IntentResponse {
     constructor(json) {
         if (json === "") {
@@ -36016,7 +36016,7 @@ var ServiceTelemetryListener_Internal = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(ServiceTelemetryListener_Internal, "__esModule", { value: true });
-ServiceTelemetryListener_Internal.ServiceTelemetryListener = undefined;
+ServiceTelemetryListener_Internal.ServiceTelemetryListener = void 0;
 /* eslint-disable max-classes-per-file */
 const Exports_js_1$5 = requireExports$5();
 const RecognitionEvents_js_1$1 = RecognitionEvents;
@@ -36214,7 +36214,7 @@ ServiceTelemetryListener_Internal.ServiceTelemetryListener = ServiceTelemetryLis
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(RequestSession$1, "__esModule", { value: true });
-RequestSession$1.RequestSession = undefined;
+RequestSession$1.RequestSession = void 0;
 const Exports_js_1$4 = requireExports$5();
 const RecognitionEvents_js_1 = RecognitionEvents;
 const ServiceTelemetryListener_Internal_js_1 = ServiceTelemetryListener_Internal;
@@ -36432,7 +36432,7 @@ var SpeechContext$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(SpeechContext$1, "__esModule", { value: true });
-SpeechContext$1.SpeechContext = undefined;
+SpeechContext$1.SpeechContext = void 0;
 /**
  * Represents the JSON used in the speech.context message sent to the speech service.
  * The dynamic grammar is always refreshed from the encapsulated dynamic grammar object.
@@ -36544,7 +36544,7 @@ var DynamicGrammarBuilder$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(DynamicGrammarBuilder$1, "__esModule", { value: true });
-DynamicGrammarBuilder$1.DynamicGrammarBuilder = undefined;
+DynamicGrammarBuilder$1.DynamicGrammarBuilder = void 0;
 /**
  * Responsible for building the object to be sent to the speech service to support dynamic grammars.
  * @class DynamicGrammarBuilder
@@ -36625,7 +36625,7 @@ var ActivityResponsePayload = {};
 	// Licensed under the MIT license.
 	// response
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.MessageDataStreamType = exports.ActivityPayloadResponse = undefined;
+	exports.MessageDataStreamType = exports.ActivityPayloadResponse = void 0;
 	class ActivityPayloadResponse {
 	    constructor(json) {
 	        this.privActivityResponse = JSON.parse(json);
@@ -36658,7 +36658,7 @@ var ActivityResponsePayload = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(DialogServiceTurnState$1, "__esModule", { value: true });
-DialogServiceTurnState$1.DialogServiceTurnState = undefined;
+DialogServiceTurnState$1.DialogServiceTurnState = void 0;
 const AudioOutputFormat_js_1 = AudioOutputFormat;
 const AudioOutputStream_js_1 = AudioOutputStream$1;
 const ActivityResponsePayload_js_1 = ActivityResponsePayload;
@@ -36710,7 +36710,7 @@ DialogServiceTurnState$1.DialogServiceTurnState = DialogServiceTurnState;
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(DialogServiceTurnStateManager$1, "__esModule", { value: true });
-DialogServiceTurnStateManager$1.DialogServiceTurnStateManager = undefined;
+DialogServiceTurnStateManager$1.DialogServiceTurnStateManager = void 0;
 const Error_js_1 = _Error;
 const DialogServiceTurnState_js_1 = DialogServiceTurnState$1;
 class DialogServiceTurnStateManager {
@@ -36749,7 +36749,7 @@ function requireDialogServiceAdapter () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(DialogServiceAdapter, "__esModule", { value: true });
-	DialogServiceAdapter.DialogServiceAdapter = undefined;
+	DialogServiceAdapter.DialogServiceAdapter = void 0;
 	const Exports_js_1 = requireExports$2();
 	const DialogEvents_js_1 = DialogEvents;
 	const Exports_js_2 = requireExports$5();
@@ -37242,7 +37242,7 @@ var AgentConfig$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(AgentConfig$1, "__esModule", { value: true });
-AgentConfig$1.AgentConfig = undefined;
+AgentConfig$1.AgentConfig = void 0;
 /**
  * Represents the JSON used in the agent.config message sent to the speech service.
  */
@@ -37272,7 +37272,7 @@ var ConversationConnectionConfig$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(ConversationConnectionConfig$1, "__esModule", { value: true });
-ConversationConnectionConfig$1.ConversationConnectionConfig = undefined;
+ConversationConnectionConfig$1.ConversationConnectionConfig = void 0;
 const RestConfigBase_js_1 = RestConfigBase$1;
 class ConversationConnectionConfig extends RestConfigBase_js_1.RestConfigBase {
     static get host() {
@@ -37314,7 +37314,7 @@ function requireConversationManager () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(ConversationManager, "__esModule", { value: true });
-	ConversationManager.ConversationManager = undefined;
+	ConversationManager.ConversationManager = void 0;
 	const Exports_js_1 = requireExports$2();
 	const Contracts_js_1 = Contracts$1;
 	const Exports_js_2 = requireExports$3();
@@ -37492,7 +37492,7 @@ var ConversationConnectionMessage$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(ConversationConnectionMessage$1, "__esModule", { value: true });
-ConversationConnectionMessage$1.ConversationConnectionMessage = undefined;
+ConversationConnectionMessage$1.ConversationConnectionMessage = void 0;
 const Exports_js_1$3 = requireExports$5();
 class ConversationConnectionMessage extends Exports_js_1$3.ConnectionMessage {
     constructor(messageType, body, headers, id) {
@@ -37511,7 +37511,7 @@ ConversationConnectionMessage$1.ConversationConnectionMessage = ConversationConn
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(ConversationWebsocketMessageFormatter$1, "__esModule", { value: true });
-ConversationWebsocketMessageFormatter$1.ConversationWebsocketMessageFormatter = undefined;
+ConversationWebsocketMessageFormatter$1.ConversationWebsocketMessageFormatter = void 0;
 const Exports_js_1$2 = requireExports$5();
 const ConversationConnectionMessage_js_1 = ConversationConnectionMessage$1;
 /**
@@ -37564,7 +37564,7 @@ function requireConversationConnectionFactory () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(ConversationConnectionFactory, "__esModule", { value: true });
-	ConversationConnectionFactory.ConversationConnectionFactory = undefined;
+	ConversationConnectionFactory.ConversationConnectionFactory = void 0;
 	const Exports_js_1 = requireExports$2();
 	const Exports_js_2 = requireExports$5();
 	const Contracts_js_1 = Contracts$1;
@@ -37604,7 +37604,7 @@ var ConversationRequestSession$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(ConversationRequestSession$1, "__esModule", { value: true });
-ConversationRequestSession$1.ConversationRequestSession = undefined;
+ConversationRequestSession$1.ConversationRequestSession = void 0;
 const Exports_js_1$1 = requireExports$5();
 /**
  * Placeholder class for the Conversation Request Session. Based off RequestSession.
@@ -37674,7 +37674,7 @@ function requireConversationTranslatorEventArgs () {
 	if (hasRequiredConversationTranslatorEventArgs) return ConversationTranslatorEventArgs;
 	hasRequiredConversationTranslatorEventArgs = 1;
 	Object.defineProperty(ConversationTranslatorEventArgs, "__esModule", { value: true });
-	ConversationTranslatorEventArgs.ConversationReceivedTranslationEventArgs = ConversationTranslatorEventArgs.ParticipantsListEventArgs = ConversationTranslatorEventArgs.ParticipantAttributeEventArgs = ConversationTranslatorEventArgs.ParticipantEventArgs = ConversationTranslatorEventArgs.LockRoomEventArgs = ConversationTranslatorEventArgs.MuteAllEventArgs = undefined;
+	ConversationTranslatorEventArgs.ConversationReceivedTranslationEventArgs = ConversationTranslatorEventArgs.ParticipantsListEventArgs = ConversationTranslatorEventArgs.ParticipantAttributeEventArgs = ConversationTranslatorEventArgs.ParticipantEventArgs = ConversationTranslatorEventArgs.LockRoomEventArgs = ConversationTranslatorEventArgs.MuteAllEventArgs = void 0;
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	/* eslint-disable max-classes-per-file */
@@ -37792,7 +37792,7 @@ var ConversationTranslatorInterfaces = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(ConversationTranslatorInterfaces, "__esModule", { value: true });
-ConversationTranslatorInterfaces.ConversationTranslatorCommandTypes = ConversationTranslatorInterfaces.ConversationTranslatorMessageTypes = ConversationTranslatorInterfaces.InternalParticipants = undefined;
+ConversationTranslatorInterfaces.ConversationTranslatorCommandTypes = ConversationTranslatorInterfaces.ConversationTranslatorMessageTypes = ConversationTranslatorInterfaces.InternalParticipants = void 0;
 /** Users participating in the conversation */
 class InternalParticipants {
     constructor(participants = [], meId) {
@@ -37891,7 +37891,7 @@ var CommandResponsePayload$1 = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(CommandResponsePayload$1, "__esModule", { value: true });
-CommandResponsePayload$1.CommandResponsePayload = undefined;
+CommandResponsePayload$1.CommandResponsePayload = void 0;
 const parseCommandResponse = (json) => JSON.parse(json);
 class CommandResponsePayload {
     constructor(json) {
@@ -37932,7 +37932,7 @@ var ParticipantResponsePayload = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(ParticipantResponsePayload, "__esModule", { value: true });
-ParticipantResponsePayload.ParticipantPayloadResponse = ParticipantResponsePayload.ParticipantsListPayloadResponse = undefined;
+ParticipantResponsePayload.ParticipantPayloadResponse = ParticipantResponsePayload.ParticipantsListPayloadResponse = void 0;
 const parseListResponse = (json) => JSON.parse(json);
 const parseParticipantResponse = (json) => JSON.parse(json);
 class ParticipantsListPayloadResponse {
@@ -38013,7 +38013,7 @@ var TranslationResponsePayload = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(TranslationResponsePayload, "__esModule", { value: true });
-TranslationResponsePayload.TextResponsePayload = TranslationResponsePayload.SpeechResponsePayload = undefined;
+TranslationResponsePayload.TextResponsePayload = TranslationResponsePayload.SpeechResponsePayload = void 0;
 const parseSpeechResponse = (json) => JSON.parse(json);
 const parseTextResponse = (json) => JSON.parse(json);
 class SpeechResponsePayload {
@@ -38114,7 +38114,7 @@ function requireConversationServiceAdapter () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(ConversationServiceAdapter, "__esModule", { value: true });
-	ConversationServiceAdapter.ConversationServiceAdapter = undefined;
+	ConversationServiceAdapter.ConversationServiceAdapter = void 0;
 	const Exports_js_1 = requireExports$5();
 	const Exports_js_2 = requireExports$3();
 	const Exports_js_3 = requireExports();
@@ -38501,7 +38501,7 @@ function requireConversationTranslatorRecognizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(ConversationTranslatorRecognizer, "__esModule", { value: true });
-	ConversationTranslatorRecognizer.ConversationTranslatorRecognizer = ConversationTranslatorRecognizer.ConversationRecognizerFactory = undefined;
+	ConversationTranslatorRecognizer.ConversationTranslatorRecognizer = ConversationTranslatorRecognizer.ConversationRecognizerFactory = void 0;
 	// eslint-disable-next-line max-classes-per-file
 	const Exports_js_1 = requireExports();
 	const Exports_js_2 = requireExports$5();
@@ -38774,7 +38774,7 @@ function requireTranscriberRecognizer () {
 	if (hasRequiredTranscriberRecognizer) return TranscriberRecognizer;
 	hasRequiredTranscriberRecognizer = 1;
 	Object.defineProperty(TranscriberRecognizer, "__esModule", { value: true });
-	TranscriberRecognizer.TranscriberRecognizer = undefined;
+	TranscriberRecognizer.TranscriberRecognizer = void 0;
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	const Exports_js_1 = requireExports$5();
@@ -38976,7 +38976,7 @@ var SynthesisAudioMetadata = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.SynthesisAudioMetadata = exports.MetadataType = undefined;
+	exports.SynthesisAudioMetadata = exports.MetadataType = void 0;
 	(function (MetadataType) {
 	    MetadataType["WordBoundary"] = "WordBoundary";
 	    MetadataType["Bookmark"] = "Bookmark";
@@ -39008,7 +39008,7 @@ var SynthesisEvents = {};
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 Object.defineProperty(SynthesisEvents, "__esModule", { value: true });
-SynthesisEvents.SynthesisStartedEvent = SynthesisEvents.ConnectingToSynthesisServiceEvent = SynthesisEvents.SynthesisTriggeredEvent = SynthesisEvents.SpeechSynthesisEvent = undefined;
+SynthesisEvents.SynthesisStartedEvent = SynthesisEvents.ConnectingToSynthesisServiceEvent = SynthesisEvents.SynthesisTriggeredEvent = SynthesisEvents.SpeechSynthesisEvent = void 0;
 /* eslint-disable max-classes-per-file */
 const Exports_js_1 = requireExports$5();
 class SpeechSynthesisEvent extends Exports_js_1.PlatformEvent {
@@ -39064,7 +39064,7 @@ function requireSynthesisTurn () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SynthesisTurn, "__esModule", { value: true });
-	SynthesisTurn.SynthesisTurn = undefined;
+	SynthesisTurn.SynthesisTurn = void 0;
 	const Exports_js_1 = requireExports$5();
 	const AudioOutputStream_js_1 = AudioOutputStream$1;
 	const Exports_js_2 = requireExports$3();
@@ -39348,7 +39348,7 @@ function requireSynthesisAdapterBase () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SynthesisAdapterBase, "__esModule", { value: true });
-	SynthesisAdapterBase.SynthesisAdapterBase = undefined;
+	SynthesisAdapterBase.SynthesisAdapterBase = void 0;
 	const Exports_js_1 = requireExports$5();
 	const Exports_js_2 = requireExports$3();
 	const Exports_js_3 = requireExports();
@@ -39739,7 +39739,7 @@ function requireAvatarSynthesisAdapter () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(AvatarSynthesisAdapter, "__esModule", { value: true });
-	AvatarSynthesisAdapter.AvatarSynthesisAdapter = undefined;
+	AvatarSynthesisAdapter.AvatarSynthesisAdapter = void 0;
 	const Exports_js_1 = requireExports$3();
 	const Exports_js_2 = requireExports();
 	let AvatarSynthesisAdapter$1 = class AvatarSynthesisAdapter extends Exports_js_2.SynthesisAdapterBase {
@@ -39821,7 +39821,7 @@ function requireSpeechSynthesisAdapter () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeechSynthesisAdapter, "__esModule", { value: true });
-	SpeechSynthesisAdapter.SpeechSynthesisAdapter = undefined;
+	SpeechSynthesisAdapter.SpeechSynthesisAdapter = void 0;
 	const Exports_js_1 = requireExports$3();
 	const Exports_js_2 = requireExports();
 	let SpeechSynthesisAdapter$1 = class SpeechSynthesisAdapter extends Exports_js_2.SynthesisAdapterBase {
@@ -39921,7 +39921,7 @@ function requireSynthesisRestAdapter () {
 	if (hasRequiredSynthesisRestAdapter) return SynthesisRestAdapter;
 	hasRequiredSynthesisRestAdapter = 1;
 	Object.defineProperty(SynthesisRestAdapter, "__esModule", { value: true });
-	SynthesisRestAdapter.SynthesisRestAdapter = undefined;
+	SynthesisRestAdapter.SynthesisRestAdapter = void 0;
 	const Exports_js_1 = requireExports$2();
 	const Exports_js_2 = requireExports$3();
 	const ConnectionFactoryBase_js_1 = requireConnectionFactoryBase();
@@ -39976,7 +39976,7 @@ function requireSynthesizerConfig () {
 		// Copyright (c) Microsoft Corporation. All rights reserved.
 		// Licensed under the MIT license.
 		Object.defineProperty(exports, "__esModule", { value: true });
-		exports.SynthesizerConfig = exports.SynthesisServiceType = undefined;
+		exports.SynthesizerConfig = exports.SynthesisServiceType = void 0;
 		const Exports_js_1 = requireExports();
 		var SynthesisServiceType;
 		(function (SynthesisServiceType) {
@@ -40025,7 +40025,7 @@ function requireSynthesisContext () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SynthesisContext, "__esModule", { value: true });
-	SynthesisContext.SynthesisContext = undefined;
+	SynthesisContext.SynthesisContext = void 0;
 	const Exports_js_1 = requireExports$3();
 	/**
 	 * Represents the JSON used in the synthesis.context message sent to the speech service.
@@ -40092,7 +40092,7 @@ function requireSpeakerRecognitionConfig () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeakerRecognitionConfig, "__esModule", { value: true });
-	SpeakerRecognitionConfig.SpeakerRecognitionConfig = undefined;
+	SpeakerRecognitionConfig.SpeakerRecognitionConfig = void 0;
 	const Exports_js_1 = requireExports();
 	let SpeakerRecognitionConfig$1 = class SpeakerRecognitionConfig {
 	    constructor(context, parameters) {
@@ -40122,7 +40122,7 @@ function requireSpeakerServiceRecognizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(SpeakerServiceRecognizer, "__esModule", { value: true });
-	SpeakerServiceRecognizer.SpeakerServiceRecognizer = undefined;
+	SpeakerServiceRecognizer.SpeakerServiceRecognizer = void 0;
 	const Exports_js_1 = requireExports$2();
 	const Exports_js_2 = requireExports$5();
 	const Exports_js_3 = requireExports$3();
@@ -40253,7 +40253,7 @@ function requireVoiceServiceRecognizer () {
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(VoiceServiceRecognizer, "__esModule", { value: true });
-	VoiceServiceRecognizer.VoiceServiceRecognizer = undefined;
+	VoiceServiceRecognizer.VoiceServiceRecognizer = void 0;
 	const Exports_js_1 = requireExports$2();
 	const Exports_js_2 = requireExports$5();
 	const Exports_js_3 = requireExports$3();
@@ -40581,7 +40581,7 @@ var SpeechServiceConfig = {};
 	// Copyright (c) Microsoft Corporation. All rights reserved.
 	// Licensed under the MIT license.
 	Object.defineProperty(exports, "__esModule", { value: true });
-	exports.type = exports.connectivity = exports.Device = exports.OS = exports.System = exports.Context = exports.SpeechServiceConfig = undefined;
+	exports.type = exports.connectivity = exports.Device = exports.OS = exports.System = exports.Context = exports.SpeechServiceConfig = void 0;
 	/* eslint-disable max-classes-per-file */
 	// The config is serialized and sent as the Speech.Config
 	class SpeechServiceConfig {
@@ -40692,7 +40692,7 @@ function requireExports () {
 		    for (var p in m) if (p !== "default" && !exports.hasOwnProperty(p)) __createBinding(exports, m, p);
 		};
 		Object.defineProperty(exports, "__esModule", { value: true });
-		exports.AutoDetectSourceLanguagesOpenRangeOptionName = exports.ForceDictationPropertyName = exports.ServicePropertiesPropertyName = exports.CancellationErrorCodePropertyName = exports.OutputFormatPropertyName = undefined;
+		exports.AutoDetectSourceLanguagesOpenRangeOptionName = exports.ForceDictationPropertyName = exports.ServicePropertiesPropertyName = exports.CancellationErrorCodePropertyName = exports.OutputFormatPropertyName = void 0;
 		// Make sure not to export internal modules.
 		//
 		__exportStar(CognitiveSubscriptionKeyAuthentication$1, exports);
@@ -40792,14 +40792,18 @@ function requireExports () {
 
 /**
  * Speech component using Microsoft Cognitive Services Speech SDK.
+ * Synthesizes speech via Azure and plays the audio using an HTML Audio element.
+ * The app's volume input controls playback volume.
  */
 class Speech extends TreeBase {
   // Define properties with default values
   stateName = new String$1("$Speak");
-  voiceURI = new String$1("$VoiceURI", "en-US-DavisNeural"); // Default to DavisNeural
-  expressStyle = new String$1("$ExpressStyle", "friendly"); // Default expression style
+  voiceURI = new String$1("$VoiceURI", "en-US-DavisNeural"); // Default voice
+  expressStyle = new String$1("$ExpressStyle", "friendly");   // Default expression style
+  volume = new Float("$Volume", 1);                          // App volume input (0.0 to 1.0)
+
   isSpeaking = false; // Track if currently speaking
-  startTime = null; // Track synthesis start time
+  startTime = null;   // Track synthesis start time
 
   constructor() {
     super();
@@ -40807,7 +40811,7 @@ class Speech extends TreeBase {
   }
 
   /**
-   * Logs messages with a timestamp for debugging purposes.
+   * Logs messages with a timestamp for debugging.
    * @param {string} message - The message to log.
    */
   logWithTimestamp(message) {
@@ -40815,7 +40819,8 @@ class Speech extends TreeBase {
   }
 
   /**
-   * Initializes the Speech Synthesizer with the Microsoft SDK.
+   * Initializes the Speech Synthesizer.
+   * No audio config is provided here to prevent auto-play; we'll handle playback manually.
    */
   initSynthesizer() {
     this.speechConfig = microsoft_cognitiveservices_speech_sdk.SpeechConfig.fromSubscription(
@@ -40826,11 +40831,8 @@ class Speech extends TreeBase {
     this.speechConfig.speechSynthesisOutputFormat =
       microsoft_cognitiveservices_speech_sdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3;
 
-    this.audioConfig = microsoft_cognitiveservices_speech_sdk.AudioConfig.fromDefaultSpeakerOutput();
-    this.synthesizer = new microsoft_cognitiveservices_speech_sdk.SpeechSynthesizer(
-      this.speechConfig,
-      this.audioConfig
-    );
+    // Create the synthesizer without an audio config (manual playback)
+    this.synthesizer = new microsoft_cognitiveservices_speech_sdk.SpeechSynthesizer(this.speechConfig);
 
     this.synthesizer.synthesisStarted = (s, e) => {
       this.startTime = performance.now();
@@ -40842,6 +40844,7 @@ class Speech extends TreeBase {
       const latency = endTime - this.startTime;
       this.logWithTimestamp(`Synthesis completed in ${latency.toFixed(2)} ms`);
       this.isSpeaking = false;
+      // Reinitialize to ensure a fresh synthesizer for the next call
       this.initSynthesizer();
     };
 
@@ -40854,6 +40857,8 @@ class Speech extends TreeBase {
 
   /**
    * Initiates speech synthesis for the given message.
+   * The synthesized audio is played via an HTML Audio element,
+   * and its volume is set based on the app's volume property.
    */
   async speak() {
     if (this.isSpeaking) {
@@ -40868,6 +40873,7 @@ class Speech extends TreeBase {
     const message = state.get(this.stateName.value);
     const voice = state.get(this.voiceURI.value) || "en-US-DavisNeural";
     const style = state.get(this.expressStyle.value) || "friendly";
+    const volValue = state.get(this.volume.value) || 1;
 
     if (!message) {
       this.logWithTimestamp("No message to speak.");
@@ -40875,8 +40881,11 @@ class Speech extends TreeBase {
       return;
     }
 
-    this.logWithTimestamp(`Using voice: ${voice}, style: ${style}, message: ${message}`);
+    this.logWithTimestamp(
+      `Using voice: ${voice}, style: ${style}, volume: ${volValue}, message: ${message}`
+    );
 
+    // Build the SSML without a volume element (volume is handled at playback)
     const ssml = `
       <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
         <voice name="${voice}">
@@ -40894,6 +40903,16 @@ class Speech extends TreeBase {
           const endTime = performance.now();
           const latency = endTime - this.startTime;
           if (result.reason === microsoft_cognitiveservices_speech_sdk.ResultReason.SynthesizingAudioCompleted) {
+            // Create an audio blob from the synthesized audio data
+            const audioBlob = new Blob([result.audioData], { type: 'audio/mp3' });
+            const url = URL.createObjectURL(audioBlob);
+            const audio = new Audio(url);
+            // Set the playback volume based on the app's volume input
+            audio.volume = volValue;
+            audio.play().then(() => {
+              // Optionally revoke the object URL after playback begins
+              setTimeout(() => URL.revokeObjectURL(url), 5000);
+            });
             this.logWithTimestamp(`Speech synthesized successfully in ${latency.toFixed(2)} ms`);
           } else if (result.reason === microsoft_cognitiveservices_speech_sdk.ResultReason.Canceled) {
             const cancellationDetails = microsoft_cognitiveservices_speech_sdk.SpeechSynthesisCancellationDetails.fromResult(result);
@@ -40917,6 +40936,11 @@ class Speech extends TreeBase {
     }
   }
 
+  /**
+   * Escapes special characters for safe SSML inclusion.
+   * @param {string} text - The text to escape.
+   * @returns {string} Escaped text.
+   */
   escapeSSML(text) {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
@@ -42715,7 +42739,7 @@ function __generator(thisArg, body) {
           }
           op = body.call(thisArg, _);
       } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
-      if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : undefined, done: true };
+      if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
   }
 }
 
@@ -42724,7 +42748,7 @@ function __values(o) {
   if (m) return m.call(o);
   if (o && typeof o.length === "number") return {
       next: function () {
-          if (o && i >= o.length) o = undefined;
+          if (o && i >= o.length) o = void 0;
           return { value: o && o[i++], done: !o };
       }
   };
@@ -42910,7 +42934,7 @@ var Subscription = (function () {
                     }
                     teardown._addParent(this);
                 }
-                (this._finalizers = (_a = this._finalizers) !== null && _a !== undefined ? _a : []).push(teardown);
+                (this._finalizers = (_a = this._finalizers) !== null && _a !== void 0 ? _a : []).push(teardown);
             }
         }
     };
@@ -42968,7 +42992,7 @@ var timeoutProvider = {
         for (var _i = 2; _i < arguments.length; _i++) {
             args[_i - 2] = arguments[_i];
         }
-        return setTimeout.apply(undefined, __spreadArray([handler, timeout], __read(args)));
+        return setTimeout.apply(void 0, __spreadArray([handler, timeout], __read(args)));
     },
     clearTimeout: function (handle) {
         return (clearTimeout)(handle);
@@ -43108,9 +43132,9 @@ var SafeSubscriber = (function (_super) {
         var partialObserver;
         if (isFunction(observerOrNext) || !observerOrNext) {
             partialObserver = {
-                next: (observerOrNext !== null && observerOrNext !== undefined ? observerOrNext : undefined),
-                error: error !== null && error !== undefined ? error : undefined,
-                complete: complete !== null && complete !== undefined ? complete : undefined,
+                next: (observerOrNext !== null && observerOrNext !== void 0 ? observerOrNext : undefined),
+                error: error !== null && error !== void 0 ? error : undefined,
+                complete: complete !== null && complete !== void 0 ? complete : undefined,
             };
         }
         else {
@@ -43214,7 +43238,7 @@ var Observable = (function () {
     };
     Observable.prototype._subscribe = function (subscriber) {
         var _a;
-        return (_a = this.source) === null || _a === undefined ? undefined : _a.subscribe(subscriber);
+        return (_a = this.source) === null || _a === void 0 ? void 0 : _a.subscribe(subscriber);
     };
     Observable.prototype[observable] = function () {
         return this;
@@ -43241,7 +43265,7 @@ var Observable = (function () {
 }());
 function getPromiseCtor(promiseCtor) {
     var _a;
-    return (_a = promiseCtor !== null && promiseCtor !== undefined ? promiseCtor : config.Promise) !== null && _a !== undefined ? _a : Promise;
+    return (_a = promiseCtor !== null && promiseCtor !== void 0 ? promiseCtor : config.Promise) !== null && _a !== void 0 ? _a : Promise;
 }
 function isObserver(value) {
     return value && isFunction(value.next) && isFunction(value.error) && isFunction(value.complete);
@@ -43251,7 +43275,7 @@ function isSubscriber(value) {
 }
 
 function hasLift(source) {
-    return isFunction(source === null || source === undefined ? undefined : source.lift);
+    return isFunction(source === null || source === void 0 ? void 0 : source.lift);
 }
 function operate(init) {
     return function (source) {
@@ -43321,7 +43345,7 @@ var OperatorSubscriber = (function (_super) {
         if (!this.shouldUnsubscribe || this.shouldUnsubscribe()) {
             var closed_1 = this.closed;
             _super.prototype.unsubscribe.call(this);
-            !closed_1 && ((_a = this.onFinalize) === null || _a === undefined ? undefined : _a.call(this));
+            !closed_1 && ((_a = this.onFinalize) === null || _a === void 0 ? void 0 : _a.call(this));
         }
     };
     return OperatorSubscriber;
@@ -43416,7 +43440,7 @@ var Subject = (function (_super) {
     Object.defineProperty(Subject.prototype, "observed", {
         get: function () {
             var _a;
-            return ((_a = this.observers) === null || _a === undefined ? undefined : _a.length) > 0;
+            return ((_a = this.observers) === null || _a === void 0 ? void 0 : _a.length) > 0;
         },
         enumerable: false,
         configurable: true
@@ -43472,19 +43496,19 @@ var AnonymousSubject = (function (_super) {
     }
     AnonymousSubject.prototype.next = function (value) {
         var _a, _b;
-        (_b = (_a = this.destination) === null || _a === undefined ? undefined : _a.next) === null || _b === undefined ? undefined : _b.call(_a, value);
+        (_b = (_a = this.destination) === null || _a === void 0 ? void 0 : _a.next) === null || _b === void 0 ? void 0 : _b.call(_a, value);
     };
     AnonymousSubject.prototype.error = function (err) {
         var _a, _b;
-        (_b = (_a = this.destination) === null || _a === undefined ? undefined : _a.error) === null || _b === undefined ? undefined : _b.call(_a, err);
+        (_b = (_a = this.destination) === null || _a === void 0 ? void 0 : _a.error) === null || _b === void 0 ? void 0 : _b.call(_a, err);
     };
     AnonymousSubject.prototype.complete = function () {
         var _a, _b;
-        (_b = (_a = this.destination) === null || _a === undefined ? undefined : _a.complete) === null || _b === undefined ? undefined : _b.call(_a);
+        (_b = (_a = this.destination) === null || _a === void 0 ? void 0 : _a.complete) === null || _b === void 0 ? void 0 : _b.call(_a);
     };
     AnonymousSubject.prototype._subscribe = function (subscriber) {
         var _a, _b;
-        return (_b = (_a = this.source) === null || _a === undefined ? undefined : _a.subscribe(subscriber)) !== null && _b !== undefined ? _b : EMPTY_SUBSCRIPTION;
+        return (_b = (_a = this.source) === null || _a === void 0 ? void 0 : _a.subscribe(subscriber)) !== null && _b !== void 0 ? _b : EMPTY_SUBSCRIPTION;
     };
     return AnonymousSubject;
 }(Subject));
@@ -43499,9 +43523,9 @@ var dateTimestampProvider = {
 var ReplaySubject = (function (_super) {
     __extends(ReplaySubject, _super);
     function ReplaySubject(_bufferSize, _windowTime, _timestampProvider) {
-        if (_bufferSize === undefined) { _bufferSize = Infinity; }
-        if (_windowTime === undefined) { _windowTime = Infinity; }
-        if (_timestampProvider === undefined) { _timestampProvider = dateTimestampProvider; }
+        if (_bufferSize === void 0) { _bufferSize = Infinity; }
+        if (_windowTime === void 0) { _windowTime = Infinity; }
+        if (_timestampProvider === void 0) { _timestampProvider = dateTimestampProvider; }
         var _this = _super.call(this) || this;
         _this._bufferSize = _bufferSize;
         _this._windowTime = _windowTime;
@@ -43567,7 +43591,7 @@ var intervalProvider = {
         for (var _i = 2; _i < arguments.length; _i++) {
             args[_i - 2] = arguments[_i];
         }
-        return setInterval.apply(undefined, __spreadArray([handler, timeout], __read(args)));
+        return setInterval.apply(void 0, __spreadArray([handler, timeout], __read(args)));
     },
     clearInterval: function (handle) {
         return (clearInterval)(handle);
@@ -43586,7 +43610,7 @@ var AsyncAction = (function (_super) {
     }
     AsyncAction.prototype.schedule = function (state, delay) {
         var _a;
-        if (delay === undefined) { delay = 0; }
+        if (delay === void 0) { delay = 0; }
         if (this.closed) {
             return this;
         }
@@ -43598,15 +43622,15 @@ var AsyncAction = (function (_super) {
         }
         this.pending = true;
         this.delay = delay;
-        this.id = (_a = this.id) !== null && _a !== undefined ? _a : this.requestAsyncId(scheduler, this.id, delay);
+        this.id = (_a = this.id) !== null && _a !== void 0 ? _a : this.requestAsyncId(scheduler, this.id, delay);
         return this;
     };
     AsyncAction.prototype.requestAsyncId = function (scheduler, _id, delay) {
-        if (delay === undefined) { delay = 0; }
+        if (delay === void 0) { delay = 0; }
         return intervalProvider.setInterval(scheduler.flush.bind(scheduler, this), delay);
     };
     AsyncAction.prototype.recycleAsyncId = function (_scheduler, id, delay) {
-        if (delay === undefined) { delay = 0; }
+        if (delay === void 0) { delay = 0; }
         if (delay != null && this.delay === delay && this.pending === false) {
             return id;
         }
@@ -43662,12 +43686,12 @@ var AsyncAction = (function (_super) {
 
 var Scheduler = (function () {
     function Scheduler(schedulerActionCtor, now) {
-        if (now === undefined) { now = Scheduler.now; }
+        if (now === void 0) { now = Scheduler.now; }
         this.schedulerActionCtor = schedulerActionCtor;
         this.now = now;
     }
     Scheduler.prototype.schedule = function (work, delay, state) {
-        if (delay === undefined) { delay = 0; }
+        if (delay === void 0) { delay = 0; }
         return new this.schedulerActionCtor(this, work).schedule(state, delay);
     };
     Scheduler.now = dateTimestampProvider.now;
@@ -43677,7 +43701,7 @@ var Scheduler = (function () {
 var AsyncScheduler = (function (_super) {
     __extends(AsyncScheduler, _super);
     function AsyncScheduler(SchedulerAction, now) {
-        if (now === undefined) { now = Scheduler.now; }
+        if (now === void 0) { now = Scheduler.now; }
         var _this = _super.call(this, SchedulerAction, now) || this;
         _this.actions = [];
         _this._active = false;
@@ -43729,7 +43753,7 @@ function popNumber(args, defaultValue) {
 var isArrayLike = (function (x) { return x && typeof x.length === 'number' && typeof x !== 'function'; });
 
 function isPromise(value) {
-    return isFunction(value === null || value === undefined ? undefined : value.then);
+    return isFunction(value === null || value === void 0 ? void 0 : value.then);
 }
 
 function isInteropObservable(input) {
@@ -43737,7 +43761,7 @@ function isInteropObservable(input) {
 }
 
 function isAsyncIterable(obj) {
-    return Symbol.asyncIterator && isFunction(obj === null || obj === undefined ? undefined : obj[Symbol.asyncIterator]);
+    return Symbol.asyncIterator && isFunction(obj === null || obj === void 0 ? void 0 : obj[Symbol.asyncIterator]);
 }
 
 function createInvalidObservableTypeError(input) {
@@ -43753,7 +43777,7 @@ function getSymbolIterator() {
 var iterator = getSymbolIterator();
 
 function isIterable(input) {
-    return isFunction(input === null || input === undefined ? undefined : input[iterator]);
+    return isFunction(input === null || input === void 0 ? void 0 : input[iterator]);
 }
 
 function readableStreamLikeToAsyncGenerator(readableStream) {
@@ -43772,7 +43796,7 @@ function readableStreamLikeToAsyncGenerator(readableStream) {
                 case 3:
                     _a = _b.sent(), value = _a.value, done = _a.done;
                     if (!done) return [3, 5];
-                    return [4, __await(undefined)];
+                    return [4, __await(void 0)];
                 case 4: return [2, _b.sent()];
                 case 5: return [4, __await(value)];
                 case 6: return [4, _b.sent()];
@@ -43789,7 +43813,7 @@ function readableStreamLikeToAsyncGenerator(readableStream) {
     });
 }
 function isReadableStreamLike(obj) {
-    return isFunction(obj === null || obj === undefined ? undefined : obj.getReader);
+    return isFunction(obj === null || obj === void 0 ? void 0 : obj.getReader);
 }
 
 function innerFrom(input) {
@@ -43880,7 +43904,7 @@ function fromReadableStreamLike(readableStream) {
 function process(asyncIterable, subscriber) {
     var asyncIterable_1, asyncIterable_1_1;
     var e_2, _a;
-    return __awaiter(this, undefined, undefined, function () {
+    return __awaiter(this, void 0, void 0, function () {
         var value, e_2_1;
         return __generator(this, function (_b) {
             switch (_b.label) {
@@ -43924,8 +43948,8 @@ function process(asyncIterable, subscriber) {
 }
 
 function executeSchedule(parentSubscription, scheduler, work, delay, repeat) {
-    if (delay === undefined) { delay = 0; }
-    if (repeat === undefined) { repeat = false; }
+    if (delay === void 0) { delay = 0; }
+    if (repeat === void 0) { repeat = false; }
     var scheduleSubscription = scheduler.schedule(function () {
         work();
         if (repeat) {
@@ -43942,14 +43966,14 @@ function executeSchedule(parentSubscription, scheduler, work, delay, repeat) {
 }
 
 function observeOn(scheduler, delay) {
-    if (delay === undefined) { delay = 0; }
+    if (delay === void 0) { delay = 0; }
     return operate(function (source, subscriber) {
         source.subscribe(createOperatorSubscriber(subscriber, function (value) { return executeSchedule(subscriber, scheduler, function () { return subscriber.next(value); }, delay); }, function () { return executeSchedule(subscriber, scheduler, function () { return subscriber.complete(); }, delay); }, function (err) { return executeSchedule(subscriber, scheduler, function () { return subscriber.error(err); }, delay); }));
     });
 }
 
 function subscribeOn(scheduler, delay) {
-    if (delay === undefined) { delay = 0; }
+    if (delay === void 0) { delay = 0; }
     return operate(function (source, subscriber) {
         subscriber.add(scheduler.schedule(function () { return source.subscribe(subscriber); }, delay));
     });
@@ -44004,7 +44028,7 @@ function scheduleIterable(input, scheduler) {
                 }
             }, 0, true);
         });
-        return function () { return isFunction(iterator$1 === null || iterator$1 === undefined ? undefined : iterator$1.return) && iterator$1.return(); };
+        return function () { return isFunction(iterator$1 === null || iterator$1 === void 0 ? void 0 : iterator$1.return) && iterator$1.return(); };
     });
 }
 
@@ -44083,9 +44107,9 @@ function map(project, thisArg) {
     });
 }
 
-var isArray$1 = Array.isArray;
+var isArray = Array.isArray;
 function callOrApply(fn, args) {
-    return isArray$1(args) ? fn.apply(undefined, __spreadArray([], __read(args))) : fn(args);
+    return isArray(args) ? fn.apply(void 0, __spreadArray([], __read(args))) : fn(args);
 }
 function mapOneOrManyArgs(fn) {
     return map(function (args) { return callOrApply(fn, args); });
@@ -44142,7 +44166,7 @@ function mergeInternals(source, subscriber, project, concurrent, onBeforeNext, e
 }
 
 function mergeMap(project, resultSelector, concurrent) {
-    if (concurrent === undefined) { concurrent = Infinity; }
+    if (concurrent === void 0) { concurrent = Infinity; }
     if (isFunction(resultSelector)) {
         return mergeMap(function (a, i) { return map(function (b, ii) { return resultSelector(a, b, i, ii); })(innerFrom(project(a, i))); }, concurrent);
     }
@@ -44153,7 +44177,7 @@ function mergeMap(project, resultSelector, concurrent) {
 }
 
 function mergeAll(concurrent) {
-    if (concurrent === undefined) { concurrent = Infinity; }
+    if (concurrent === void 0) { concurrent = Infinity; }
     return mergeMap(identity, concurrent);
 }
 
@@ -44210,8 +44234,8 @@ function isEventTarget(target) {
 }
 
 function timer(dueTime, intervalOrScheduler, scheduler) {
-    if (dueTime === undefined) { dueTime = 0; }
-    if (scheduler === undefined) { scheduler = async; }
+    if (dueTime === void 0) { dueTime = 0; }
+    if (scheduler === void 0) { scheduler = async; }
     var intervalDuration = -1;
     if (intervalOrScheduler != null) {
         if (isScheduler(intervalOrScheduler)) {
@@ -44259,11 +44283,6 @@ function merge$1() {
                 mergeAll(concurrent)(from(sources, scheduler));
 }
 
-var isArray = Array.isArray;
-function argsOrArgArray(args) {
-    return args.length === 1 && isArray(args[0]) ? args[0] : args;
-}
-
 function filter(predicate, thisArg) {
     return operate(function (source, subscriber) {
         var index = 0;
@@ -44289,7 +44308,7 @@ function scanInternals(accumulator, seed, hasSeed, emitOnNext, emitBeforeComplet
 }
 
 function debounceTime(dueTime, scheduler) {
-    if (scheduler === undefined) { scheduler = asyncScheduler; }
+    if (scheduler === void 0) { scheduler = asyncScheduler; }
     return operate(function (source, subscriber) {
         var activeTask = null;
         var lastValue = null;
@@ -44355,14 +44374,14 @@ function delayWhen(delayDurationSelector, subscriptionDelay) {
 }
 
 function delay(due, scheduler) {
-    if (scheduler === undefined) { scheduler = asyncScheduler; }
+    if (scheduler === void 0) { scheduler = asyncScheduler; }
     var duration = timer(due, scheduler);
     return delayWhen(function () { return duration; });
 }
 
 function distinctUntilChanged(comparator, keySelector) {
-    if (keySelector === undefined) { keySelector = identity; }
-    comparator = comparator !== null && comparator !== undefined ? comparator : defaultCompare;
+    if (keySelector === void 0) { keySelector = identity; }
+    comparator = comparator !== null && comparator !== void 0 ? comparator : defaultCompare;
     return operate(function (source, subscriber) {
         var previousKey;
         var first = true;
@@ -44381,7 +44400,7 @@ function defaultCompare(a, b) {
 }
 
 function distinctUntilKeyChanged(key, compare) {
-    return distinctUntilChanged(function (x, y) { return x[key] === y[key]; });
+    return distinctUntilChanged(function (x, y) { return (x[key] === y[key]); });
 }
 
 function groupBy(keySelector, elementOrOptions, duration, connector) {
@@ -44446,7 +44465,6 @@ function merge() {
     }
     var scheduler = popScheduler(args);
     var concurrent = popNumber(args, Infinity);
-    args = argsOrArgArray(args);
     return operate(function (source, subscriber) {
         mergeAll(concurrent)(from(__spreadArray([source], __read(args)), scheduler)).subscribe(subscriber);
     });
@@ -44457,11 +44475,11 @@ function mergeWith() {
     for (var _i = 0; _i < arguments.length; _i++) {
         otherSources[_i] = arguments[_i];
     }
-    return merge.apply(undefined, __spreadArray([], __read(otherSources)));
+    return merge.apply(void 0, __spreadArray([], __read(otherSources)));
 }
 
 function retry(configOrCount) {
-    if (configOrCount === undefined) { configOrCount = Infinity; }
+    if (configOrCount === void 0) { configOrCount = Infinity; }
     var config;
     if (configOrCount && typeof configOrCount === 'object') {
         config = configOrCount;
@@ -44471,7 +44489,7 @@ function retry(configOrCount) {
             count: configOrCount,
         };
     }
-    var _a = config.count, count = _a === undefined ? Infinity : _a, delay = config.delay, _b = config.resetOnSuccess, resetOnSuccess = _b === undefined ? false : _b;
+    var _a = config.count, count = _a === void 0 ? Infinity : _a, delay = config.delay, _b = config.resetOnSuccess, resetOnSuccess = _b === void 0 ? false : _b;
     return count <= 0
         ? identity
         : operate(function (source, subscriber) {
@@ -44643,7 +44661,7 @@ function throttle(durationSelector, config) {
 }
 
 function throttleTime(duration, scheduler, config) {
-    if (scheduler === undefined) { scheduler = asyncScheduler; }
+    if (scheduler === void 0) { scheduler = asyncScheduler; }
     var duration$ = timer(duration, scheduler);
     return throttle(function () { return duration$; }, config);
 }
