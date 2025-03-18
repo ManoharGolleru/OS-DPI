@@ -7,17 +7,17 @@ import * as Props from "./props";
 
 /**
  * Speech component using Microsoft Cognitive Services Speech SDK.
- * Synthesizes speech via Azure and plays the audio using the Web Audio API.
- * Volume is controlled via a GainNode.
+ * Synthesizes speech via Azure and plays the audio using an HTMLAudioElement
+ * connected to the Web Audio API for gain control.
  */
 class Speech extends TreeBase {
   // App properties with default values
   stateName = new Props.String("$Speak");
   voiceURI = new Props.String("$VoiceURI", "en-US-DavisNeural"); // Default voice
-  expressStyle = new Props.String("$ExpressStyle", "friendly");   // Default expression style
+  expressStyle = new Props.String("$ExpressStyle", "friendly");   // Default style
   volume = new Props.Float("$Volume", 1);                          // App volume input (0.0 to 1.0)
 
-  isSpeaking = false; // Track synthesis status
+  isSpeaking = false; // Track if synthesis is ongoing
   startTime = null;   // For latency logging
 
   constructor() {
@@ -29,7 +29,7 @@ class Speech extends TreeBase {
 
   /**
    * Logs messages with a timestamp.
-   * @param {string} message - Message to log.
+   * @param {string} message - The message to log.
    */
   logWithTimestamp(message) {
     console.log(`[${new Date().toISOString()}] ${message}`);
@@ -56,7 +56,7 @@ class Speech extends TreeBase {
       const latency = performance.now() - this.startTime;
       this.logWithTimestamp(`Synthesis completed in ${latency.toFixed(2)} ms`);
       this.isSpeaking = false;
-      // Reinitialize to ensure a fresh synthesizer for the next call
+      // Reinitialize for the next call
       this.initSynthesizer();
     };
     this.synthesizer.synthesisCanceled = (s, e) => {
@@ -67,8 +67,8 @@ class Speech extends TreeBase {
   }
 
   /**
-   * Initiates speech synthesis and plays the audio using the Web Audio API.
-   * The audio is decoded into a buffer, then played via a GainNode with the desired volume.
+   * Initiates speech synthesis and plays audio using an HTMLAudioElement connected
+   * to a GainNode so that the app's volume input affects output loudness.
    */
   async speak() {
     if (this.isSpeaking) {
@@ -82,15 +82,21 @@ class Speech extends TreeBase {
     const voice = state.get(this.voiceURI.value) || "en-US-DavisNeural";
     const style = state.get(this.expressStyle.value) || "friendly";
     const volValue = state.get(this.volume.value);
+    
+    // Log the volume value for debugging.
+    this.logWithTimestamp(`Volume value from state: ${volValue}`);
+    
     if (!message) {
       this.logWithTimestamp("No message to speak.");
       this.isSpeaking = false;
       return;
     }
+    
     this.logWithTimestamp(
       `Using voice: ${voice}, style: ${style}, volume: ${volValue}, message: ${message}`
     );
-    // Build SSML (without volume settings in SSML)
+    
+    // Build the SSML (without volume settings; volume will be controlled on playback)
     const ssml = `
       <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
         <voice name="${voice}">
@@ -99,6 +105,7 @@ class Speech extends TreeBase {
           </mstts:express-as>
         </voice>
       </speak>`;
+      
     try {
       this.startTime = performance.now();
       this.synthesizer.speakSsmlAsync(
@@ -106,28 +113,28 @@ class Speech extends TreeBase {
         (result) => {
           const latency = performance.now() - this.startTime;
           if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
-            // Ensure we have an ArrayBuffer from the audio data (result.audioData may be a Uint8Array)
-            const arrayBuffer = result.audioData instanceof ArrayBuffer
-              ? result.audioData
-              : result.audioData.buffer;
-            // Resume the audio context if needed (e.g., on iOS)
+            // Create an audio blob from the synthesized audio data.
+            const audioBlob = new Blob([result.audioData], { type: 'audio/mp3' });
+            const url = URL.createObjectURL(audioBlob);
+            const audio = new Audio(url);
+            // Ensure the AudioContext is resumed (necessary in some browsers)
             if (this.audioContext.state === 'suspended') {
               this.audioContext.resume();
             }
-            // Decode the audio data and play it using a GainNode for volume control
-            this.audioContext.decodeAudioData(arrayBuffer)
-              .then(decodedData => {
-                const source = this.audioContext.createBufferSource();
-                source.buffer = decodedData;
-                const gainNode = this.audioContext.createGain();
-                gainNode.gain.value = volValue; // Apply the volume value
-                source.connect(gainNode);
-                gainNode.connect(this.audioContext.destination);
-                source.start(0);
-              })
-              .catch(error => {
-                this.logWithTimestamp(`Error decoding audio data: ${error}`);
-              });
+            // Use the MediaElementAudioSourceNode approach.
+            const mediaSource = this.audioContext.createMediaElementSource(audio);
+            const gainNode = this.audioContext.createGain();
+            gainNode.gain.value = volValue; // Set the gain to the volume input
+            // Connect the nodes: media source -> gain -> destination
+            mediaSource.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            // Play the audio element.
+            audio.play().then(() => {
+              // Optionally revoke the object URL after a short delay.
+              setTimeout(() => URL.revokeObjectURL(url), 5000);
+            }).catch(err => {
+              this.logWithTimestamp(`Audio play error: ${err}`);
+            });
             this.logWithTimestamp(`Speech synthesized successfully in ${latency.toFixed(2)} ms`);
           } else if (result.reason === sdk.ResultReason.Canceled) {
             const cancellationDetails = sdk.SpeechSynthesisCancellationDetails.fromResult(result);
