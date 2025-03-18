@@ -5,150 +5,134 @@ import { html } from "uhtml";
 import Globals from "app/globals";
 import * as Props from "./props";
 
-/**
- * Speech component using Microsoft Cognitive Services Speech SDK.
- */
 class Speech extends TreeBase {
-  // Define properties with default values
+  // Component properties
   stateName = new Props.String("$Speak");
-  voiceURI = new Props.String("$VoiceURI", "en-US-DavisNeural"); // Default to DavisNeural
-  expressStyle = new Props.String("$ExpressStyle", "friendly"); // Default expression style
-  volume = new Props.Float(1.0); // Volume control (0.0 to 1.0)
-  isSpeaking = false; // Track if currently speaking
-  startTime = null; // Track synthesis start time
+  voiceURI = new Props.String("$VoiceURI", "en-US-DavisNeural");
+  expressStyle = new Props.String("$ExpressStyle", "friendly");
+  volume = new Props.Float(1.0);  // Volume range: 0.0 (mute) to 2.0 (+50dB)
+  isSpeaking = false;
+  startTime = null;
 
   constructor() {
     super();
     this.initSynthesizer();
   }
 
-  /**
-   * Logs messages with a timestamp for debugging purposes.
-   * @param {string} message - The message to log.
-   */
   logWithTimestamp(message) {
     console.log(`[${new Date().toISOString()}] ${message}`);
   }
 
-  /**
-   * Initializes the Speech Synthesizer with the Microsoft SDK.
-   */
   initSynthesizer() {
     this.speechConfig = sdk.SpeechConfig.fromSubscription(
-      'c7d8e36fdf414cbaae05819919fd416d', // Replace with your actual subscription key
-      'eastus' // Replace with your service region
+      'c7d8e36fdf414cbaae05819919fd416d',
+      'eastus'
     );
 
     this.speechConfig.speechSynthesisOutputFormat =
       sdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3;
 
-    // Set the volume for the audio output
     this.audioConfig = sdk.AudioConfig.fromDefaultSpeakerOutput();
-    this.audioConfig.setProperty(sdk.PropertyId.SpeechServiceConnection_SynthOutputVolume, this.volume.value.toString());
-
+    
     this.synthesizer = new sdk.SpeechSynthesizer(
       this.speechConfig,
       this.audioConfig
     );
 
+    // Event handlers for synthesis lifecycle
     this.synthesizer.synthesisStarted = (s, e) => {
       this.startTime = performance.now();
       this.logWithTimestamp("Synthesis started");
     };
 
     this.synthesizer.synthesisCompleted = (s, e) => {
-      const endTime = performance.now();
-      const latency = endTime - this.startTime;
+      const latency = performance.now() - this.startTime;
       this.logWithTimestamp(`Synthesis completed in ${latency.toFixed(2)} ms`);
-      this.isSpeaking = false;
-      this.initSynthesizer();
+      this.cleanupAndReinit();
     };
 
     this.synthesizer.synthesisCanceled = (s, e) => {
-      this.logWithTimestamp(`Synthesis canceled: ${e.reason}`);
-      this.isSpeaking = false;
-      this.initSynthesizer();
+      this.logWithTimestamp(`Canceled: ${e.reason}`);
+      this.cleanupAndReinit();
     };
   }
 
-  /**
-   * Initiates speech synthesis for the given message.
-   */
+  cleanupAndReinit() {
+    this.isSpeaking = false;
+    try {
+      this.synthesizer.close();
+    } catch (e) {
+      this.logWithTimestamp(`Cleanup error: ${e}`);
+    }
+    this.initSynthesizer();
+  }
+
   async speak() {
     if (this.isSpeaking) {
-      this.logWithTimestamp("Cancelling current speech synthesis.");
-      this.synthesizer.close();
-      this.isSpeaking = false;
+      this.logWithTimestamp("Canceling previous synthesis");
+      this.cleanupAndReinit();
     }
-
-    this.isSpeaking = true;
 
     const { state } = Globals;
     const message = state.get(this.stateName.value);
     const voice = state.get(this.voiceURI.value) || "en-US-DavisNeural";
     const style = state.get(this.expressStyle.value) || "friendly";
-    const volume = state.get(this.volume.value) || 1.0; // Default volume to 1.0 if not set
+    const rawVolume = state.get(this.volume.value) ?? 1.0;
+    const volume = Math.min(Math.max(rawVolume, 0.0), 2.0);
 
-    if (!message) {
-      this.logWithTimestamp("No message to speak.");
-      this.isSpeaking = false;
+    if (!message?.trim()) {
+      this.logWithTimestamp("Empty message");
       return;
     }
 
-    this.logWithTimestamp(`Using voice: ${voice}, style: ${style}, volume: ${volume}, message: ${message}`);
-
-    // Update the volume in the audio config
-    this.audioConfig.setProperty(sdk.PropertyId.SpeechServiceConnection_SynthOutputVolume, volume.toString());
+    // Convert volume to dB scale (0.0-2.0 => -50dB to +50dB)
+    const dB = (volume - 1) * 50;
+    const volumeAttr = `${dB >= 0 ? '+' : ''}${dB.toFixed(1)}dB`;
 
     const ssml = `
-      <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
-        <voice name="${voice}">
-          <mstts:express-as style="${style}">
-            ${this.escapeSSML(message)}
-          </mstts:express-as>
-        </voice>
-      </speak>`;
+<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" 
+       xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
+  <voice name="${voice}">
+    <mstts:express-as style="${style}">
+      <prosody volume="${volumeAttr}">
+        ${this.escapeSSML(message)}
+      </prosody>
+    </mstts:express-as>
+  </voice>
+</speak>`;
 
     try {
+      this.isSpeaking = true;
       this.startTime = performance.now();
-      this.synthesizer.speakSsmlAsync(
-        ssml,
-        (result) => {
-          const endTime = performance.now();
-          const latency = endTime - this.startTime;
-          if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
-            this.logWithTimestamp(`Speech synthesized successfully in ${latency.toFixed(2)} ms`);
-          } else if (result.reason === sdk.ResultReason.Canceled) {
-            const cancellationDetails = sdk.SpeechSynthesisCancellationDetails.fromResult(result);
-            this.logWithTimestamp(
-              `Speech synthesis canceled: ${cancellationDetails.reason}, ${cancellationDetails.errorDetails}`
-            );
-          }
-          this.isSpeaking = false;
-          this.initSynthesizer();
-        },
-        (error) => {
-          this.logWithTimestamp(`An error occurred: ${error}`);
-          this.isSpeaking = false;
-          this.initSynthesizer();
-        }
-      );
+      
+      const result = await this.synthesizer.speakSsmlAsync(ssml);
+      
+      if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
+        const latency = performance.now() - this.startTime;
+        this.logWithTimestamp(`Success in ${latency.toFixed(2)} ms`);
+      } else {
+        const details = sdk.SpeechSynthesisCancellationDetails.fromResult(result);
+        this.logWithTimestamp(`Canceled: ${details.reason} (${details.errorDetails})`);
+      }
     } catch (error) {
-      this.logWithTimestamp(`Error in speak method: ${error}`);
-      this.isSpeaking = false;
-      this.initSynthesizer();
+      this.logWithTimestamp(`Synthesis error: ${error}`);
+    } finally {
+      this.cleanupAndReinit();
     }
   }
 
   escapeSSML(text) {
-    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return text.replace(/&/g, "&amp;")
+               .replace(/</g, "&lt;")
+               .replace(/>/g, "&gt;")
+               .replace(/"/g, "&quot;")
+               .replace(/'/g, "&apos;");
   }
 
   disconnectedCallback() {
     if (this.isSpeaking) {
-      this.synthesizer.close();
-      this.isSpeaking = false;
-      this.logWithTimestamp("Synthesizer stopped on component disconnect");
+      this.cleanupAndReinit();
+      this.logWithTimestamp("Stopped on component disconnect");
     }
   }
 
@@ -163,4 +147,3 @@ class Speech extends TreeBase {
 
 TreeBase.register(Speech, "Speech");
 export default Speech;
-
