@@ -7,8 +7,8 @@ import * as Props from "./props";
 
 /**
  * Speech component using Microsoft Cognitive Services Speech SDK.
- * Synthesizes speech via Azure and plays the audio using an HTML Audio element.
- * The app's volume input controls playback volume.
+ * Synthesizes speech via Azure and plays the audio using the Web Audio API
+ * for more explicit volume (gain) control.
  */
 class Speech extends TreeBase {
   // Define properties with default values
@@ -72,8 +72,8 @@ class Speech extends TreeBase {
 
   /**
    * Initiates speech synthesis for the given message.
-   * The synthesized audio is played via an HTML Audio element,
-   * and its volume is set based on the app's volume property.
+   * The synthesized audio is played via an HTML Audio element connected to the
+   * Web Audio API's GainNode to control volume.
    */
   async speak() {
     if (this.isSpeaking) {
@@ -88,19 +88,19 @@ class Speech extends TreeBase {
     const message = state.get(this.stateName.value);
     const voice = state.get(this.voiceURI.value) || "en-US-DavisNeural";
     const style = state.get(this.expressStyle.value) || "friendly";
-    const volValue = state.get(this.volume.value) || 1;
-
+    const volValue = state.get(this.volume.value);
+    
     if (!message) {
       this.logWithTimestamp("No message to speak.");
       this.isSpeaking = false;
       return;
     }
-
+    
     this.logWithTimestamp(
       `Using voice: ${voice}, style: ${style}, volume: ${volValue}, message: ${message}`
     );
 
-    // Build the SSML without a volume element (volume is handled at playback)
+    // Build the SSML without any volume element (volume is handled in playback)
     const ssml = `
       <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
         <voice name="${voice}">
@@ -122,8 +122,21 @@ class Speech extends TreeBase {
             const audioBlob = new Blob([result.audioData], { type: 'audio/mp3' });
             const url = URL.createObjectURL(audioBlob);
             const audio = new Audio(url);
-            // Set the playback volume based on the app's volume input
-            audio.volume = volValue;
+
+            // Instead of relying solely on audio.volume,
+            // use the Web Audio API for gain control.
+            if (window.AudioContext) {
+              const audioContext = new AudioContext();
+              const source = audioContext.createMediaElementSource(audio);
+              const gainNode = audioContext.createGain();
+              gainNode.gain.value = volValue; // Set gain using the volume input
+              source.connect(gainNode);
+              gainNode.connect(audioContext.destination);
+            } else {
+              // Fallback to setting audio.volume directly
+              audio.volume = volValue;
+            }
+            
             audio.play().then(() => {
               // Optionally revoke the object URL after playback begins
               setTimeout(() => URL.revokeObjectURL(url), 5000);
