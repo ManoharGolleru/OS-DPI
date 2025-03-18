@@ -40791,59 +40791,60 @@ function requireExports () {
 // speech.js
 
 /**
- * Speech component using Microsoft Cognitive Services Speech SDK.
- * Synthesizes speech via Azure and plays the audio using an HTMLAudioElement
- * connected to the Web Audio API for gain control.
+ * Speech component using Azure Speech SDK.
+ * Synthesizes speech via Azure and plays the audio using the Web Audio API.
+ * The volume (loudness) is controlled via a GainNode.
  */
 class Speech extends TreeBase {
-  // App properties with default values
+  // App properties
   stateName = new String$1("$Speak");
   voiceURI = new String$1("$VoiceURI", "en-US-DavisNeural"); // Default voice
   expressStyle = new String$1("$ExpressStyle", "friendly");   // Default style
-  volume = new Float("$Volume", 1);                          // App volume input (0.0 to 1.0)
+  volume = new Float("$Volume", 1);                          // Volume: 0.0 (mute) to 1.0 (full)
 
-  isSpeaking = false; // Track if synthesis is ongoing
-  startTime = null;   // For latency logging
+  isSpeaking = false;
+  startTime = null;
 
   constructor() {
     super();
-    // Create and persist an AudioContext instance
+    // Create a persistent AudioContext (reused across calls)
     this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     this.initSynthesizer();
   }
 
-  /**
-   * Logs messages with a timestamp.
-   * @param {string} message - The message to log.
-   */
   logWithTimestamp(message) {
     console.log(`[${new Date().toISOString()}] ${message}`);
   }
 
   /**
-   * Initializes the Azure Speech synthesizer.
-   * No audio config is provided so that playback is handled manually.
+   * Initializes the Azure Speech synthesizer without providing an audio output configuration.
+   * This allows us to handle playback manually.
    */
   initSynthesizer() {
+    // Replace these with your actual subscription key and region
     this.speechConfig = microsoft_cognitiveservices_speech_sdk.SpeechConfig.fromSubscription(
-      'c7d8e36fdf414cbaae05819919fd416d', // Replace with your subscription key
-      'eastus' // Replace with your service region
+      'YOUR_SUBSCRIPTION_KEY_HERE', 
+      'YOUR_SERVICE_REGION_HERE'
     );
     this.speechConfig.speechSynthesisOutputFormat =
       microsoft_cognitiveservices_speech_sdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3;
-    // Create the synthesizer without an audio config for manual playback
+
+    // Create the synthesizer without an audio config (manual playback)
     this.synthesizer = new microsoft_cognitiveservices_speech_sdk.SpeechSynthesizer(this.speechConfig);
+
     this.synthesizer.synthesisStarted = (s, e) => {
       this.startTime = performance.now();
       this.logWithTimestamp("Synthesis started");
     };
+
     this.synthesizer.synthesisCompleted = (s, e) => {
       const latency = performance.now() - this.startTime;
       this.logWithTimestamp(`Synthesis completed in ${latency.toFixed(2)} ms`);
       this.isSpeaking = false;
-      // Reinitialize for the next call
+      // Reinitialize the synthesizer for the next call
       this.initSynthesizer();
     };
+
     this.synthesizer.synthesisCanceled = (s, e) => {
       this.logWithTimestamp(`Synthesis canceled: ${e.reason}`);
       this.isSpeaking = false;
@@ -40852,36 +40853,37 @@ class Speech extends TreeBase {
   }
 
   /**
-   * Initiates speech synthesis and plays audio using an HTMLAudioElement connected
-   * to a GainNode so that the app's volume input affects output loudness.
+   * Initiates speech synthesis and plays the audio through a GainNode.
+   * This should allow adjusting the audible volume.
    */
   async speak() {
     if (this.isSpeaking) {
-      this.logWithTimestamp("Cancelling current speech synthesis.");
+      this.logWithTimestamp("Cancelling current synthesis.");
       this.synthesizer.close();
       this.isSpeaking = false;
     }
     this.isSpeaking = true;
+
     const { state } = Globals;
     const message = state.get(this.stateName.value);
     const voice = state.get(this.voiceURI.value) || "en-US-DavisNeural";
     const style = state.get(this.expressStyle.value) || "friendly";
     const volValue = state.get(this.volume.value);
     
-    // Log the volume value for debugging.
+    // Log volume for debugging
     this.logWithTimestamp(`Volume value from state: ${volValue}`);
-    
+
     if (!message) {
       this.logWithTimestamp("No message to speak.");
       this.isSpeaking = false;
       return;
     }
-    
+
     this.logWithTimestamp(
-      `Using voice: ${voice}, style: ${style}, volume: ${volValue}, message: ${message}`
+      `Synthesizing with voice: ${voice}, style: ${style}, volume: ${volValue}, message: ${message}`
     );
-    
-    // Build the SSML (without volume settings; volume will be controlled on playback)
+
+    // Build SSML (without volume tags—volume is controlled at playback)
     const ssml = `
       <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
         <voice name="${voice}">
@@ -40890,7 +40892,7 @@ class Speech extends TreeBase {
           </mstts:express-as>
         </voice>
       </speak>`;
-      
+
     try {
       this.startTime = performance.now();
       this.synthesizer.speakSsmlAsync(
@@ -40898,38 +40900,43 @@ class Speech extends TreeBase {
         (result) => {
           const latency = performance.now() - this.startTime;
           if (result.reason === microsoft_cognitiveservices_speech_sdk.ResultReason.SynthesizingAudioCompleted) {
-            // Create an audio blob from the synthesized audio data.
-            const audioBlob = new Blob([result.audioData], { type: 'audio/mp3' });
-            const url = URL.createObjectURL(audioBlob);
-            const audio = new Audio(url);
-            // Ensure the AudioContext is resumed (necessary in some browsers)
-            if (this.audioContext.state === 'suspended') {
+            this.logWithTimestamp(`Synthesis successful in ${latency.toFixed(2)} ms`);
+            // Get the audio data (ensure it's an ArrayBuffer)
+            const arrayBuffer = result.audioData instanceof ArrayBuffer
+              ? result.audioData
+              : result.audioData.buffer;
+            // Resume AudioContext if needed (some browsers suspend it)
+            if (this.audioContext.state === "suspended") {
               this.audioContext.resume();
             }
-            // Use the MediaElementAudioSourceNode approach.
-            const mediaSource = this.audioContext.createMediaElementSource(audio);
-            const gainNode = this.audioContext.createGain();
-            gainNode.gain.value = volValue; // Set the gain to the volume input
-            // Connect the nodes: media source -> gain -> destination
-            mediaSource.connect(gainNode);
-            gainNode.connect(this.audioContext.destination);
-            // Play the audio element.
-            audio.play().then(() => {
-              // Optionally revoke the object URL after a short delay.
-              setTimeout(() => URL.revokeObjectURL(url), 5000);
-            }).catch(err => {
-              this.logWithTimestamp(`Audio play error: ${err}`);
-            });
-            this.logWithTimestamp(`Speech synthesized successfully in ${latency.toFixed(2)} ms`);
+            // Decode the audio data
+            this.audioContext.decodeAudioData(arrayBuffer)
+              .then((decodedData) => {
+                // Create a source and gain node
+                const source = this.audioContext.createBufferSource();
+                source.buffer = decodedData;
+                const gainNode = this.audioContext.createGain();
+                gainNode.gain.value = volValue; // Apply the volume from state
+                // Connect the audio nodes: source -> gain -> destination
+                source.connect(gainNode);
+                gainNode.connect(this.audioContext.destination);
+                // Start playback
+                source.start(0);
+              })
+              .catch((error) => {
+                this.logWithTimestamp(`Error decoding audio data: ${error}`);
+              });
           } else if (result.reason === microsoft_cognitiveservices_speech_sdk.ResultReason.Canceled) {
             const cancellationDetails = microsoft_cognitiveservices_speech_sdk.SpeechSynthesisCancellationDetails.fromResult(result);
-            this.logWithTimestamp(`Speech synthesis canceled: ${cancellationDetails.reason}, ${cancellationDetails.errorDetails}`);
+            this.logWithTimestamp(
+              `Synthesis canceled: ${cancellationDetails.reason}, ${cancellationDetails.errorDetails}`
+            );
           }
           this.isSpeaking = false;
           this.initSynthesizer();
         },
         (error) => {
-          this.logWithTimestamp(`An error occurred: ${error}`);
+          this.logWithTimestamp(`Synthesis error: ${error}`);
           this.isSpeaking = false;
           this.initSynthesizer();
         }
@@ -40942,19 +40949,21 @@ class Speech extends TreeBase {
   }
 
   /**
-   * Escapes special characters for safe inclusion in SSML.
+   * Escapes special characters for SSML.
    * @param {string} text - Text to escape.
    * @returns {string} Escaped text.
    */
   escapeSSML(text) {
-    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return text.replace(/&/g, "&amp;")
+               .replace(/</g, "&lt;")
+               .replace(/>/g, "&gt;");
   }
 
   disconnectedCallback() {
     if (this.isSpeaking) {
       this.synthesizer.close();
       this.isSpeaking = false;
-      this.logWithTimestamp("Synthesizer stopped on component disconnect");
+      this.logWithTimestamp("Synthesizer stopped on disconnect");
     }
   }
 
