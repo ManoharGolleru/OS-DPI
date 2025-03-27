@@ -26,7 +26,7 @@ export default defineConfig({
     include: ["tracky-mouse"],
   },
   build: {
-    sourcemap: true,
+    sourcemap: false,
     minify: false,
     target: "esnext",
     assetsInlineLimit: 0,

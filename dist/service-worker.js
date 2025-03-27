@@ -1,6 +1,6 @@
 var GHPATH = "/OS-DPI";
 var APP_PREFIX = "osdpi_";
-var VERSION = "2024-11-5-11-17-49";
+var VERSION = "2025-2-26-11-51-16";
 var URLS = [
   `${GHPATH}/`,
   `${GHPATH}/index.html`,
@@ -64,4 +64,3 @@ self.addEventListener("message", (event) => {
     self.skipWaiting();
   }
 });
-//# sourceMappingURL=service-worker.js.map

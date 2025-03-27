@@ -3800,10 +3800,10 @@ const udomdiff = (parentNode, a, b, get, before) => {
       // or asymmetric too
       // [1, 2, 3, 4, 5]
       // [1, 2, 3, 5, 6, 4]
-      const node = get(a[--aEnd], -1).nextSibling;
+      const node = get(a[--aEnd], -0).nextSibling;
       parentNode.insertBefore(
         get(b[bStart++], 1),
-        get(a[aStart++], -1).nextSibling
+        get(a[aStart++], -0).nextSibling
       );
       parentNode.insertBefore(get(b[--bEnd], 1), node);
       // mark the future index as identical (yeah, it's dirty, but cheap 👍)
@@ -3877,7 +3877,7 @@ const udomdiff = (parentNode, a, b, get, before) => {
   return b;
 };
 
-const { isArray: isArray$3 } = Array;
+const { isArray: isArray$2 } = Array;
 const { getPrototypeOf: getPrototypeOf$1, getOwnPropertyDescriptor } = Object;
 
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
@@ -3926,7 +3926,6 @@ const ELEMENT_NODE = 1;
 const COMMENT_NODE = 8;
 const DOCUMENT_FRAGMENT_NODE = 11;
 
-/*! (c) Andrea Giammarchi - ISC */
 const {setPrototypeOf} = Object;
 
 /**
@@ -4083,7 +4082,7 @@ const at = (element, value, name) => {
   const known = listeners.get(element) || set(listeners, element, {});
   let current = known[name];
   if (current && current[0]) element.removeEventListener(name, ...current);
-  current = isArray$3(value) ? value : [value, false];
+  current = isArray$2(value) ? value : [value, false];
   known[name] = current;
   if (current[0]) element.addEventListener(name, ...current);
   return value;
@@ -4380,8 +4379,6 @@ const create = parse => (
 const TEXT_ELEMENTS = /^(?:plaintext|script|style|textarea|title|xmp)$/i;
 const VOID_ELEMENTS = /^(?:area|base|br|col|embed|hr|img|input|keygen|link|menuitem|meta|param|source|track|wbr)$/i;
 
-/*! (c) Andrea Giammarchi - ISC */
-
 const elements = /<([a-zA-Z0-9]+[a-zA-Z0-9:._-]*)([^>]*?)(\/?)>/g;
 const attributes = /([^\s\\>"'=]+)\s*=\s*(['"]?)\x01/g;
 const holes = /[\x01\x02]/g;
@@ -4488,7 +4485,7 @@ const resolve = (template, values, xml) => {
       if (node.nodeType === COMMENT_NODE) {
         if (node.data === search) {
           // ⚠️ once array, always array!
-          const update = isArray$3(values[i - 1]) ? array : hole;
+          const update = isArray$2(values[i - 1]) ? array : hole;
           if (update === hole) replace.push(node);
           entries.push(abc(createPath(node), update, null));
           search = `${prefix}${i++}`;
@@ -4691,7 +4688,7 @@ var lowercase = function (string) {
  * @param {*} value Reference to check.
  * @returns {boolean} True if `value` is an `Array`.
  */
-var isArray$2 = Array.isArray;
+var isArray$1 = Array.isArray;
 
 var manualLowercase = function (s) {
 	return isString(s)
@@ -4706,6 +4703,17 @@ var manualLowercase = function (s) {
 // with correct but slower alternatives. See https://github.com/angular/angular.js/issues/11387
 if ("I".toLowerCase() !== "i") {
 	lowercase = manualLowercase;
+}
+
+// Run a function and disallow temporarly the use of the Function constructor
+// This makes arbitrary code generation attacks way more complicated.
+function runWithFunctionConstructorProtection(fn) {
+	var originalFunctionConstructor = Function.prototype.constructor;
+	delete Function.prototype.constructor;
+	var result = fn();
+	// eslint-disable-next-line no-extend-native
+	Function.prototype.constructor = originalFunctionConstructor;
+	return result;
 }
 
 var jqLite, // delay binding since jQuery could be loaded after us.
@@ -4729,7 +4737,7 @@ function isArrayLike$1(obj) {
 	// * jqLite is either the jQuery or jqLite constructor function
 	// * we have to check the existence of jqLite first as this method is called
 	//   via the forEach method when constructing the jqLite object in the first place
-	if (isArray$2(obj) || isString(obj) || (jqLite)) {
+	if (isArray$1(obj) || isString(obj) || (jqLite)) {
 		return true;
 	}
 
@@ -4795,7 +4803,7 @@ function forEach(obj, iterator, context) {
 					iterator.call(context, obj[key], key, obj);
 				}
 			}
-		} else if (isArray$2(obj) || isArrayLike$1(obj)) {
+		} else if (isArray$1(obj) || isArrayLike$1(obj)) {
 			var isPrimitive = typeof obj !== "object";
 			for (key = 0, length = obj.length; key < length; key++) {
 				if (isPrimitive || key in obj) {
@@ -5045,7 +5053,7 @@ function copy(source, destination) {
 	function copyRecurse(source, destination) {
 		var h = destination.$$hashKey;
 		var key;
-		if (isArray$2(source)) {
+		if (isArray$1(source)) {
 			for (var i = 0, ii = source.length; i < ii; i++) {
 				destination.push(copyElement(source[i]));
 			}
@@ -5097,7 +5105,7 @@ function copy(source, destination) {
 		var destination = copyType(source);
 
 		if (destination === undefined) {
-			destination = isArray$2(source)
+			destination = isArray$1(source)
 				? []
 				: Object.create(getPrototypeOf(source));
 			needsRecurse = true;
@@ -5385,7 +5393,7 @@ var ESCAPE = {
  * @constructor
  */
 function Lexer$1(options) {
-	this.options = options;
+	this.options = options || {};
 }
 
 Lexer$1.prototype = {
@@ -6312,14 +6320,27 @@ ASTCompiler.prototype = {
 			extra +
 			this.watchFns() +
 			"return fn;";
+
 		// eslint-disable-next-line no-new-func
-		var fn = new Function(
+		var wrappedFn = new Function(
 			"$filter",
 			"getStringValue",
 			"ifDefined",
 			"plus",
 			fnString
 		)(this.$filter, getStringValue, ifDefined, plusFn);
+
+		var fn = function (s, l, a, i) {
+			return runWithFunctionConstructorProtection(function () {
+				return wrappedFn(s, l, a, i);
+			});
+		};
+		fn.assign = function (s, v, l) {
+			return runWithFunctionConstructorProtection(function () {
+				return wrappedFn.assign(s, v, l);
+			});
+		};
+		fn.inputs = wrappedFn.inputs;
 
 		this.state = this.stage = undefined;
 		fn.ast = ast;
@@ -6514,7 +6535,12 @@ ASTCompiler.prototype = {
 						);
 					},
 					intoId &&
-						self.lazyAssign(intoId, self.nonComputedMember("l", ast.name))
+						function () {
+							self.if_(
+								self.hasOwnProperty_("l", ast.name),
+								self.lazyAssign(intoId, self.nonComputedMember("l", ast.name))
+							);
+						}
 				);
 				recursionFn(intoId);
 				break;
@@ -6788,7 +6814,7 @@ ASTCompiler.prototype = {
 	},
 
 	filter: function (filterName) {
-		if (!this.state.filters.hasOwnProperty(filterName)) {
+		if (!hasOwnProperty.call(this.state.filters, filterName)) {
 			this.state.filters[filterName] = this.nextId(true);
 		}
 		return this.state.filters[filterName];
@@ -6880,7 +6906,7 @@ ASTCompiler.prototype = {
 			left +
 			"[" +
 			right +
-			"] : null)"
+			"] : undefined)"
 		);
 	},
 
@@ -6997,7 +7023,7 @@ ASTInterpreter.prototype = {
 		forEach(ast.body, function (expression) {
 			expressions.push(self.recurse(expression.expression));
 		});
-		var fn =
+		var wrappedFn =
 			ast.body.length === 0
 				? noop$1
 				: ast.body.length === 1
@@ -7011,10 +7037,22 @@ ASTInterpreter.prototype = {
 						};
 
 		if (assign) {
-			fn.assign = function (scope, value, locals) {
+			wrappedFn.assign = function (scope, value, locals) {
 				return assign(scope, locals, value);
 			};
 		}
+
+		var fn = function (scope, locals) {
+			return runWithFunctionConstructorProtection(function () {
+				return wrappedFn(scope, locals);
+			});
+		};
+		fn.assign = function (scope, value, locals) {
+			return runWithFunctionConstructorProtection(function () {
+				return wrappedFn.assign(scope, value, locals);
+			});
+		};
+
 		if (inputs) {
 			fn.inputs = inputs;
 		}
@@ -7342,7 +7380,10 @@ ASTInterpreter.prototype = {
 			if (create && create !== 1 && base && base[name] == null) {
 				base[name] = {};
 			}
-			var value = base ? base[name] : undefined;
+			var value;
+			if (base && hasOwnProperty.call(base, name)) {
+				value = base ? base[name] : undefined;
+			}
 			if (context) {
 				return { context: base, name: name, value: value };
 			}
@@ -7407,6 +7448,8 @@ ASTInterpreter.prototype = {
 var Parser$1 = function Parser(lexer, $filter, options) {
 	this.lexer = lexer;
 	this.$filter = $filter;
+	options = options || {};
+	options.handleThis = options.handleThis != null ? options.handleThis : true;
 	this.options = options;
 	this.ast = new AST(lexer, options);
 	this.ast.selfReferential = {
@@ -7583,7 +7626,7 @@ function promisifyRequest(request) {
         request.addEventListener('success', success);
         request.addEventListener('error', error);
     });
-    // This mapping exists in reverseTransformCache but doesn't doesn't exist in transformCache. This
+    // This mapping exists in reverseTransformCache but doesn't exist in transformCache. This
     // is because we create many promises from a single IDBRequest.
     reverseTransformCache.set(promise, request);
     return promise;
@@ -8885,7 +8928,7 @@ function unzipSync(data, opts) {
     return files;
 }
 
-const e$1=(()=>{if("undefined"==typeof self)return !1;if("top"in self&&self!==top)try{top.window.document._=0;}catch(e){return !1}return "showOpenFilePicker"in self})(),t$1=e$1?Promise.resolve().then(function(){return l}):Promise.resolve().then(function(){return v});async function n(...e){return (await t$1).default(...e)}e$1?Promise.resolve().then(function(){return y}):Promise.resolve().then(function(){return b});const a=e$1?Promise.resolve().then(function(){return m}):Promise.resolve().then(function(){return k});async function o$1(...e){return (await a).default(...e)}const s=async e=>{const t=await e.getFile();return t.handle=e,t};var c=async(e=[{}])=>{Array.isArray(e)||(e=[e]);const t=[];e.forEach((e,n)=>{t[n]={description:e.description||"Files",accept:{}},e.mimeTypes?e.mimeTypes.map(r=>{t[n].accept[r]=e.extensions||[];}):t[n].accept["*/*"]=e.extensions||[];});const n=await window.showOpenFilePicker({id:e[0].id,startIn:e[0].startIn,types:t,multiple:e[0].multiple||!1,excludeAcceptAllOption:e[0].excludeAcceptAllOption||!1}),r=await Promise.all(n.map(s));return e[0].multiple?r:r[0]},l={__proto__:null,default:c};function u(e){function t(e){if(Object(e)!==e)return Promise.reject(new TypeError(e+" is not an object."));var t=e.done;return Promise.resolve(e.value).then(function(e){return {value:e,done:t}})}return u=function(e){this.s=e,this.n=e.next;},u.prototype={s:null,n:null,next:function(){return t(this.n.apply(this.s,arguments))},return:function(e){var n=this.s.return;return void 0===n?Promise.resolve({value:e,done:!0}):t(n.apply(this.s,arguments))},throw:function(e){var n=this.s.return;return void 0===n?Promise.reject(e):t(n.apply(this.s,arguments))}},new u(e)}const p=async(e,t,n=e.name,r)=>{const i=[],a=[];var o,s=!1,c=!1;try{for(var l,d=function(e){var t,n,r,i=2;for("undefined"!=typeof Symbol&&(n=Symbol.asyncIterator,r=Symbol.iterator);i--;){if(n&&null!=(t=e[n]))return t.call(e);if(r&&null!=(t=e[r]))return new u(t.call(e));n="@@asyncIterator",r="@@iterator";}throw new TypeError("Object is not async iterable")}(e.values());s=!(l=await d.next()).done;s=!1){const o=l.value,s=`${n}/${o.name}`;"file"===o.kind?a.push(o.getFile().then(t=>(t.directoryHandle=e,t.handle=o,Object.defineProperty(t,"webkitRelativePath",{configurable:!0,enumerable:!0,get:()=>s})))):"directory"!==o.kind||!t||r&&r(o)||i.push(p(o,t,s,r));}}catch(e){c=!0,o=e;}finally{try{s&&null!=d.return&&await d.return();}finally{if(c)throw o}}return [...(await Promise.all(i)).flat(),...await Promise.all(a)]};var d=async(e={})=>{e.recursive=e.recursive||!1,e.mode=e.mode||"read";const t=await window.showDirectoryPicker({id:e.id,startIn:e.startIn,mode:e.mode});return (await(await t.values()).next()).done?[t]:p(t,e.recursive,void 0,e.skipDirectory)},y={__proto__:null,default:d},f$1=async(e,t=[{}],n=null,r=!1,i=null)=>{Array.isArray(t)||(t=[t]),t[0].fileName=t[0].fileName||"Untitled";const a=[];let o=null;if(e instanceof Blob&&e.type?o=e.type:e.headers&&e.headers.get("content-type")&&(o=e.headers.get("content-type")),t.forEach((e,t)=>{a[t]={description:e.description||"Files",accept:{}},e.mimeTypes?(0===t&&o&&e.mimeTypes.push(o),e.mimeTypes.map(n=>{a[t].accept[n]=e.extensions||[];})):o?a[t].accept[o]=e.extensions||[]:a[t].accept["*/*"]=e.extensions||[];}),n)try{await n.getFile();}catch(e){if(n=null,r)throw e}const s=n||await window.showSaveFilePicker({suggestedName:t[0].fileName,id:t[0].id,startIn:t[0].startIn,types:a,excludeAcceptAllOption:t[0].excludeAcceptAllOption||!1});!n&&i&&i(s);const c=await s.createWritable();if("stream"in e){const t=e.stream();return await t.pipeTo(c),s}return "body"in e?(await e.body.pipeTo(c),s):(await c.write(await e),await c.close(),s)},m={__proto__:null,default:f$1},w=async(e=[{}])=>(Array.isArray(e)||(e=[e]),new Promise((t,n)=>{const r=document.createElement("input");r.type="file";const i=[...e.map(e=>e.mimeTypes||[]),...e.map(e=>e.extensions||[])].join();r.multiple=e[0].multiple||!1,r.accept=i||"",r.style.display="none",document.body.append(r);const a=e=>{"function"==typeof o&&o(),t(e);},o=e[0].legacySetup&&e[0].legacySetup(a,()=>o(n),r),s=()=>{window.removeEventListener("focus",s),r.remove();};r.addEventListener("click",()=>{window.addEventListener("focus",s);}),r.addEventListener("change",()=>{window.removeEventListener("focus",s),r.remove(),a(r.multiple?Array.from(r.files):r.files[0]);}),"showPicker"in HTMLInputElement.prototype?r.showPicker():r.click();})),v={__proto__:null,default:w},h=async(e=[{}])=>(Array.isArray(e)||(e=[e]),e[0].recursive=e[0].recursive||!1,new Promise((t,n)=>{const r=document.createElement("input");r.type="file",r.webkitdirectory=!0;const i=e=>{"function"==typeof a&&a(),t(e);},a=e[0].legacySetup&&e[0].legacySetup(i,()=>a(n),r);r.addEventListener("change",()=>{let t=Array.from(r.files);e[0].recursive?e[0].recursive&&e[0].skipDirectory&&(t=t.filter(t=>t.webkitRelativePath.split("/").every(t=>!e[0].skipDirectory({name:t,kind:"directory"})))):t=t.filter(e=>2===e.webkitRelativePath.split("/").length),i(t);}),"showPicker"in HTMLInputElement.prototype?r.showPicker():r.click();})),b={__proto__:null,default:h},P=async(e,t={})=>{Array.isArray(t)&&(t=t[0]);const n=document.createElement("a");let r=e;"body"in e&&(r=await async function(e,t){const n=e.getReader(),r=new ReadableStream({start:e=>async function t(){return n.read().then(({done:n,value:r})=>{if(!n)return e.enqueue(r),t();e.close();})}()}),i=new Response(r),a=await i.blob();return n.releaseLock(),new Blob([a],{type:t})}(e.body,e.headers.get("content-type"))),n.download=t.fileName||"Untitled",n.href=URL.createObjectURL(await r);const i=()=>{"function"==typeof a&&a();},a=t.legacySetup&&t.legacySetup(i,()=>a(),n);return n.addEventListener("click",()=>{setTimeout(()=>URL.revokeObjectURL(n.href),3e4),i();}),n.click(),null},k={__proto__:null,default:P};
+const e$1=(()=>{if("undefined"==typeof self)return  false;if("top"in self&&self!==top)try{top.window.document._=0;}catch(e){return  false}return "showOpenFilePicker"in self})(),t$1=e$1?Promise.resolve().then(function(){return l}):Promise.resolve().then(function(){return v});async function n(...e){return (await t$1).default(...e)}e$1?Promise.resolve().then(function(){return y}):Promise.resolve().then(function(){return b});const a=e$1?Promise.resolve().then(function(){return m}):Promise.resolve().then(function(){return k});async function o$1(...e){return (await a).default(...e)}const s=async e=>{const t=await e.getFile();return t.handle=e,t};var c=async(e=[{}])=>{Array.isArray(e)||(e=[e]);const t=[];e.forEach((e,n)=>{t[n]={description:e.description||"Files",accept:{}},e.mimeTypes?e.mimeTypes.map(r=>{t[n].accept[r]=e.extensions||[];}):t[n].accept["*/*"]=e.extensions||[];});const n=await window.showOpenFilePicker({id:e[0].id,startIn:e[0].startIn,types:t,multiple:e[0].multiple||false,excludeAcceptAllOption:e[0].excludeAcceptAllOption||false}),r=await Promise.all(n.map(s));return e[0].multiple?r:r[0]},l={__proto__:null,default:c};function u(e){function t(e){if(Object(e)!==e)return Promise.reject(new TypeError(e+" is not an object."));var t=e.done;return Promise.resolve(e.value).then(function(e){return {value:e,done:t}})}return u=function(e){this.s=e,this.n=e.next;},u.prototype={s:null,n:null,next:function(){return t(this.n.apply(this.s,arguments))},return:function(e){var n=this.s.return;return void 0===n?Promise.resolve({value:e,done:true}):t(n.apply(this.s,arguments))},throw:function(e){var n=this.s.return;return void 0===n?Promise.reject(e):t(n.apply(this.s,arguments))}},new u(e)}const p=async(e,t,n=e.name,r)=>{const i=[],a=[];var o,s=false,c=false;try{for(var l,d=function(e){var t,n,r,i=2;for("undefined"!=typeof Symbol&&(n=Symbol.asyncIterator,r=Symbol.iterator);i--;){if(n&&null!=(t=e[n]))return t.call(e);if(r&&null!=(t=e[r]))return new u(t.call(e));n="@@asyncIterator",r="@@iterator";}throw new TypeError("Object is not async iterable")}(e.values());s=!(l=await d.next()).done;s=!1){const o=l.value,s=`${n}/${o.name}`;"file"===o.kind?a.push(o.getFile().then(t=>(t.directoryHandle=e,t.handle=o,Object.defineProperty(t,"webkitRelativePath",{configurable:!0,enumerable:!0,get:()=>s})))):"directory"!==o.kind||!t||r&&r(o)||i.push(p(o,t,s,r));}}catch(e){c=true,o=e;}finally{try{s&&null!=d.return&&await d.return();}finally{if(c)throw o}}return [...(await Promise.all(i)).flat(),...await Promise.all(a)]};var d=async(e={})=>{e.recursive=e.recursive||false,e.mode=e.mode||"read";const t=await window.showDirectoryPicker({id:e.id,startIn:e.startIn,mode:e.mode});return (await(await t.values()).next()).done?[t]:p(t,e.recursive,void 0,e.skipDirectory)},y={__proto__:null,default:d},f$1=async(e,t=[{}],n=null,r=false,i=null)=>{Array.isArray(t)||(t=[t]),t[0].fileName=t[0].fileName||"Untitled";const a=[];let o=null;if(e instanceof Blob&&e.type?o=e.type:e.headers&&e.headers.get("content-type")&&(o=e.headers.get("content-type")),t.forEach((e,t)=>{a[t]={description:e.description||"Files",accept:{}},e.mimeTypes?(0===t&&o&&e.mimeTypes.push(o),e.mimeTypes.map(n=>{a[t].accept[n]=e.extensions||[];})):o?a[t].accept[o]=e.extensions||[]:a[t].accept["*/*"]=e.extensions||[];}),n)try{await n.getFile();}catch(e){if(n=null,r)throw e}const s=n||await window.showSaveFilePicker({suggestedName:t[0].fileName,id:t[0].id,startIn:t[0].startIn,types:a,excludeAcceptAllOption:t[0].excludeAcceptAllOption||false});!n&&i&&i(s);const c=await s.createWritable();if("stream"in e){const t=e.stream();return await t.pipeTo(c),s}return "body"in e?(await e.body.pipeTo(c),s):(await c.write(await e),await c.close(),s)},m={__proto__:null,default:f$1},w=async(e=[{}])=>(Array.isArray(e)||(e=[e]),new Promise((t,n)=>{const r=document.createElement("input");r.type="file";const i=[...e.map(e=>e.mimeTypes||[]),...e.map(e=>e.extensions||[])].join();r.multiple=e[0].multiple||false,r.accept=i||"",r.style.display="none",document.body.append(r);const a=e=>{"function"==typeof o&&o(),t(e);},o=e[0].legacySetup&&e[0].legacySetup(a,()=>o(n),r),s=()=>{window.removeEventListener("focus",s),r.remove();};r.addEventListener("click",()=>{window.addEventListener("focus",s);}),r.addEventListener("change",()=>{window.removeEventListener("focus",s),r.remove(),a(r.multiple?Array.from(r.files):r.files[0]);}),"showPicker"in HTMLInputElement.prototype?r.showPicker():r.click();})),v={__proto__:null,default:w},h=async(e=[{}])=>(Array.isArray(e)||(e=[e]),e[0].recursive=e[0].recursive||false,new Promise((t,n)=>{const r=document.createElement("input");r.type="file",r.webkitdirectory=true;const i=e=>{"function"==typeof a&&a(),t(e);},a=e[0].legacySetup&&e[0].legacySetup(i,()=>a(n),r);r.addEventListener("change",()=>{let t=Array.from(r.files);e[0].recursive?e[0].recursive&&e[0].skipDirectory&&(t=t.filter(t=>t.webkitRelativePath.split("/").every(t=>!e[0].skipDirectory({name:t,kind:"directory"})))):t=t.filter(e=>2===e.webkitRelativePath.split("/").length),i(t);}),"showPicker"in HTMLInputElement.prototype?r.showPicker():r.click();})),b={__proto__:null,default:h},P=async(e,t={})=>{Array.isArray(t)&&(t=t[0]);const n=document.createElement("a");let r=e;"body"in e&&(r=await async function(e,t){const n=e.getReader(),r=new ReadableStream({start:e=>async function t(){return n.read().then(({done:n,value:r})=>{if(!n)return e.enqueue(r),t();e.close();})}()}),i=new Response(r),a=await i.blob();return n.releaseLock(),new Blob([a],{type:t})}(e.body,e.headers.get("content-type"))),n.download=t.fileName||"Untitled",n.href=URL.createObjectURL(await r);const i=()=>{"function"==typeof a&&a();},a=t.legacySetup&&t.legacySetup(i,()=>a(),n);return n.addEventListener("click",()=>{setTimeout(()=>URL.revokeObjectURL(n.href),3e4),i();}),n.click(),null},k={__proto__:null,default:P};
 
 class DB {
   constructor() {
@@ -12424,7 +12467,7 @@ class Data {
   }
 }
 
-const e=Object.assign||((e,t)=>(t&&Object.keys(t).forEach(o=>e[o]=t[o]),e)),t=(e,r,s)=>{const c=typeof s;if(s&&"object"===c)if(Array.isArray(s))for(const o of s)r=t(e,r,o);else for(const c of Object.keys(s)){const f=s[c];"function"==typeof f?r[c]=f(r[c],o):void 0===f?e&&!isNaN(c)?r.splice(c,1):delete r[c]:null===f||"object"!=typeof f||Array.isArray(f)?r[c]=f:"object"==typeof r[c]?r[c]=f===r[c]?f:o(r[c],f):r[c]=t(!1,{},f);}else "function"===c&&(r=s(r,o));return r},o=(o,...r)=>{const s=Array.isArray(o);return t(s,s?o.slice():e({},o),r)};
+const e=Object.assign||((e,t)=>(t&&Object.keys(t).forEach(o=>e[o]=t[o]),e)),t=(e,r,s)=>{const c=typeof s;if(s&&"object"===c)if(Array.isArray(s))for(const o of s)r=t(e,r,o);else for(const c of Object.keys(s)){const f=s[c];"function"==typeof f?r[c]=f(r[c],o):void 0===f?e&&!isNaN(c)?r.splice(c,1):delete r[c]:null===f||"object"!=typeof f||Array.isArray(f)?r[c]=f:"object"==typeof r[c]?r[c]=f===r[c]?f:o(r[c],f):r[c]=t(false,{},f);}else "function"===c&&(r=s(r,o));return r},o=(o,...r)=>{const s=Array.isArray(o);return t(s,s?o.slice():e({},o),r)};
 
 let State$1 = class State {
   constructor(persistKey = "") {
@@ -13586,18 +13629,26 @@ class Display extends TreeBase {
 }
 TreeBase.register(Display, "Display");
 
+// Option Class
 let Option$1 = class Option extends TreeBase {
-  name = new String$1("", { hiddenLabel: true });
-  value = new String$1("", { hiddenLabel: true });
+  name = new String$1("", { hiddenLabel: true }); // Hide label in settings
+  value = new String$1("", { hiddenLabel: true }); // Hide label in settings
+  selectedColor = new Color("pink", { hiddenLabel: true }); // Hide label
+  unselectedColor = new Color("lightgray", { hiddenLabel: true }); // Hide label
+  cache = {}; // Cache for performance or state management
 };
 TreeBase.register(Option$1, "Option");
 
+// Radio Class
 class Radio extends TreeBase {
-  scale = new Float(1);
-  label = new String$1("");
-  stateName = new String$1("$radio");
-  unselected = new Color("lightgray");
-  selected = new Color("pink");
+  // General Properties
+  scale = new Float(1); // Scale property
+  label = new String$1(""); // Label for the Radio group
+
+  // State Management Properties
+  primaryStateName = new String$1("$radio"); // Primary state name
+  secondaryStateName = new String$1("$secondaryRadio"); // Secondary state name
+  lastClickedStateName = new String$1("$LastClicked"); // Tracks the last clicked button
 
   allowedChildren = ["Option", "GridFilter"];
 
@@ -13609,86 +13660,157 @@ class Radio extends TreeBase {
   }
 
   /**
-   * true if there exist rows with the this.filters and the value
-   * @arg {Option} option
+   * Determines if an option is valid based on current filters and data.
+   * @param {Option} option
    * @returns {boolean}
    */
   valid(option) {
-    const { data } = Globals;
+    const { data, state } = Globals;
     const filters = this.filterChildren(GridFilter);
     return (
       !filters.length ||
-      data.hasMatchingRows(filters, {
-        states: {
-          [this.stateName.value]: option.value.value,
-        },
-      })
+      data.hasMatchingRows(
+        filters,
+        state.clone({
+          [this.primaryStateName.value]: option.value.value,
+          [this.secondaryStateName.value]: option.value.value,
+        }),
+        option.cache || {}
+      )
     );
   }
 
   /**
-   * handle clicks on the chooser
+   * Handles click events on the radio buttons.
+   * Defined as an arrow function to preserve 'this' context.
    * @param {MouseEvent} event
    */
-  handleClick({ target }) {
+  handleClick = ({ target }) => {
     if (target instanceof HTMLButtonElement) {
       const value = target.value;
-      const name = this.stateName.value;
-      Globals.state.update({ [name]: value });
+      const primaryState = this.primaryStateName.value;
+      const secondaryState = this.secondaryStateName.value;
+      const lastClickedState = this.lastClickedStateName.value;
+      const lastClicked = Globals.state.get(lastClickedState);
+      const stateUpdates = {};
+
+      if (lastClicked === value) {
+        // Toggle off if the same button is clicked again
+        stateUpdates[primaryState] = null;
+        stateUpdates[secondaryState] = null;
+        stateUpdates[lastClickedState] = null; // Optionally reset last clicked
+      } else {
+        // Set the new value for both primary and secondary states
+        stateUpdates[primaryState] = value;
+        stateUpdates[secondaryState] = value;
+        stateUpdates[lastClickedState] = value; // Update last clicked button
+      }
+
+      Globals.state.update(stateUpdates);
+    }
+  };
+
+  /**
+   * Initializes the primary and secondary states if they are not already set.
+   * This method should be called once after the component is mounted.
+   */
+  initializeStates() {
+    const { state } = Globals;
+    const primaryStateName = this.primaryStateName.value;
+    const secondaryStateName = this.secondaryStateName.value;
+
+    if (!state.get(primaryStateName)) {
+      const firstValidOption = this.options.find((option) => this.valid(option));
+      if (firstValidOption) {
+        const value = firstValidOption.value.value;
+        state.update({
+          [primaryStateName]: value,
+          [secondaryStateName]: value,
+        });
+      } else {
+        console.warn("No valid options available to initialize the Radio component.");
+      }
     }
   }
 
+  /**
+   * Generates the HTML template for the Radio component.
+   * @returns {HTMLElement}
+   */
   template() {
     const { state } = Globals;
-    const stateName = this.stateName.value;
-    const selected = this.selected.value;
-    const unselected = this.unselected.value;
+    const primaryStateName = this.primaryStateName.value;
+    const secondaryStateName = this.secondaryStateName.value;
     const radioLabel = this.label.value;
-    let currentValue = state.get(stateName);
+
+    // Initialize states if not already set
+    this.initializeStates();
+
+    const currentPrimary = state.get(primaryStateName);
+    const currentSecondary = state.get(secondaryStateName);
+
     const choices = this.options.map((choice, index) => {
       const choiceDisabled = !this.valid(choice);
       const choiceValue = choice.value.value;
       const choiceName = choice.name.value;
-      if (stateName && !currentValue && !choiceDisabled && choiceValue) {
-        currentValue = choiceValue;
-        state.define(stateName, choiceValue);
-      }
-      const color =
-        choiceValue == currentValue || (!currentValue && index == 0)
-          ? selected
-          : unselected;
+
+      // Determine if the current choice is selected in either state
+      const isSelectedPrimary = choiceValue === currentPrimary;
+      const isSelectedSecondary = choiceValue === currentSecondary;
+      const isSelected = isSelectedPrimary || isSelectedSecondary;
+      const color = isSelected
+        ? choice.selectedColor.value
+        : choice.unselectedColor.value;
+
       return html`<button
         style=${styleString({ backgroundColor: color })}
         value=${choiceValue}
         ?disabled=${choiceDisabled}
         data=${{
           ComponentType: this.className,
-          ComponentName: radioLabel || stateName,
+          ComponentName: radioLabel || primaryStateName,
           label: choiceName,
         }}
-        click
-        @Activate=${() => state.update({ [stateName]: choice.value.value })}
-      >
+        @click=${this.handleClick}
+       >
         ${choiceName}
       </button>`;
     });
 
     return this.component(
       {},
-      html`<fieldset class="flex">
-        ${(radioLabel && [html`<legend>${radioLabel}</legend>`]) || []}
+      html`<fieldset class="flex" role="radiogroup">
+        ${radioLabel ? html`<legend>${radioLabel}</legend>` : null}
         ${choices}
-      </fieldset>`,
+      </fieldset>`
     );
   }
 
+  /**
+   * Generates the settings UI for the Radio component.
+   * @returns {HTMLElement[]}
+   */
   settingsDetails() {
     const props = this.props;
-    const inputs = Object.values(props).map((prop) => prop.input());
+
+    // Exclude properties handled in specific fieldsets to prevent duplication
+    const excludedProps = new Set([
+      "primaryStateName",
+      "secondaryStateName",
+      "lastClickedStateName",
+      // Color properties are handled within each Option
+    ]);
+
+    // Include only props not in excludedProps
+    const generalInputs = Object.entries(props)
+      .filter(([key]) => !excludedProps.has(key))
+      .map(([, prop]) => prop.input());
+
     const filters = this.filterChildren(GridFilter);
-    const editFilters = !filters.length
-      ? []
-      : [GridFilter.FilterSettings(filters)];
+    const editFilters = filters.length
+      ? [GridFilter.FilterSettings(filters)]
+      : [];
+
     const options = this.filterChildren(Option$1);
     const editOptions = html`<fieldset>
       <legend>Options</legend>
@@ -13698,6 +13820,8 @@ class Radio extends TreeBase {
             <th>#</th>
             <th>Name</th>
             <th>Value</th>
+            <th>Selected Color</th>
+            <th>Unselected Color</th>
           </tr>
         </thead>
         <tbody>
@@ -13707,15 +13831,46 @@ class Radio extends TreeBase {
                 <td>${index + 1}</td>
                 <td>${option.name.input()}</td>
                 <td>${option.value.input()}</td>
+                <td>${option.selectedColor.input()}</td> <!-- No extra label -->
+                <td>${option.unselectedColor.input()}</td> <!-- No extra label -->
               </tr>
-            `,
+            `
           )}
         </tbody>
       </table>
     </fieldset>`;
-    return [html`<div>${editFilters}${editOptions}${inputs}</div>`];
+
+    // State Management Settings with Descriptive Labels
+    const stateSettings = html`<fieldset>
+      <legend>State Management</legend>
+      <label>
+        
+        ${this.primaryStateName.input()}
+      </label>
+      <label>
+        
+        ${this.secondaryStateName.input()}
+      </label>
+      <label>
+        
+        ${this.lastClickedStateName.input()}
+      </label>
+    </fieldset>`;
+
+    return [
+      html`<div>
+        ${editFilters}
+        ${editOptions}
+        ${stateSettings}
+        ${generalInputs}
+      </div>`,
+    ];
   }
 
+  /**
+   * Returns the children settings, currently empty.
+   * @returns {HTMLElement}
+   */
   settingsChildren() {
     return html`<div />`;
   }
@@ -14157,12 +14312,19 @@ class Button extends TreeBase {
 }
 TreeBase.register(Button, "Button");
 
+// Monitor.js
+
+
 class Monitor extends TreeBase {
   template() {
     const { state, actions: rules } = Globals;
     const stateKeys = [
       ...new Set([...Object.keys(state.values), ...accessed.keys()]),
     ].sort();
+
+    // Debugging: Log stateKeys
+    console.log("Rendering Monitor - State Keys:", stateKeys);
+
     const s = html`<table class="state">
       <thead>
         <tr>
@@ -14180,9 +14342,16 @@ class Monitor extends TreeBase {
             if (value.length > clamped.length) {
               clamped += "...";
             }
+
+            // Ensure clamped is always a string
+            clamped = String(clamped);
+
+            // Debugging: Log each state row
+            console.log(`State Key: ${key}, Value: ${clamped}`);
+
             return html`<tr
-              ?updated=${state.hasBeenUpdated(key)}
-              ?undefined=${accessed.get(key) === false}
+              ?updated=${Boolean(state.hasBeenUpdated(key))}
+              ?undefined=${Boolean(accessed.get(key) === false)}
             >
               <td>${key}</td>
               <td>${clamped}</td>
@@ -14198,6 +14367,10 @@ class Monitor extends TreeBase {
     const rowKeys = [
       ...new Set([...Object.keys(row), ...rowAccessedKeys]),
     ].sort();
+
+    // Debugging: Log rowKeys
+    console.log("Rendering Monitor - Row Keys:", rowKeys);
+
     const f = html`<table class="fields">
       <thead>
         <tr>
@@ -14208,12 +14381,17 @@ class Monitor extends TreeBase {
       <tbody>
         ${rowKeys.map((key) => {
           const value = row[key];
+          const displayValue = typeof value === "string" ? value : String(value || "");
+
+          // Debugging: Log each field row
+          console.log(`Field Key: ${key}, Value: ${displayValue}`);
+
           return html`<tr
-            ?undefined=${accessed.get(`_${key}`) === false}
-            ?accessed=${accessed.has(`_${key}`)}
+            ?undefined=${Boolean(accessed.get(`_${key}`) === false)}
+            ?accessed=${Boolean(accessed.has(`_${key}`))}
           >
             <td>#${key}</td>
-            <td>${value || ""}</td>
+            <td>${displayValue}</td>
           </tr>`;
         })}
       </tbody>
@@ -21313,6 +21491,7 @@ function requireSpeechConfig () {
 	    }
 	    requestWordLevelTimestamps() {
 	        this.privProperties.setProperty(Exports_js_2.PropertyId.SpeechServiceResponse_RequestWordLevelTimestamps, "true");
+	        this.privProperties.setProperty(Exports_js_1.OutputFormatPropertyName, Exports_js_2.OutputFormat[Exports_js_2.OutputFormat.Detailed]);
 	    }
 	    enableDictation() {
 	        this.privProperties.setProperty(Exports_js_1.ForceDictationPropertyName, "true");
@@ -22053,13 +22232,38 @@ var PropertyId = {};
 	     */
 	    PropertyId[PropertyId["Speech_SegmentationSilenceTimeoutMs"] = 32] = "Speech_SegmentationSilenceTimeoutMs";
 	    /**
+	     * SegmentationMaximumTimeMs represents the maximum length of a spoken phrase when using the Time segmentation strategy.
+	     * As the length of a spoken phrase approaches this value, the @member Speech_SegmentationSilenceTimeoutMs will be reduced until either
+	     * the phrase silence timeout is reached or the phrase reaches the maximum length.
+	     *
+	     * Added in version 1.42.0.
+	     */
+	    PropertyId[PropertyId["Speech_SegmentationMaximumTimeMs"] = 33] = "Speech_SegmentationMaximumTimeMs";
+	    /**
+	     * SegmentationStrategy defines the strategy used to determine when a spoken phrase has ended and a final Recognized result should be generated.
+	     * Allowed values are "Default", "Time", and "Semantic".
+	     *
+	     * Valid values:
+	     * - "Default": Uses the default strategy and settings as determined by the Speech Service. Suitable for most situations.
+	     * - "Time": Uses a time-based strategy where the amount of silence between speech determines when to generate a final result.
+	     * - "Semantic": Uses an AI model to determine the end of a spoken phrase based on the phrase's content.
+	     *
+	     * Additional Notes:
+	     * - When using the Time strategy, @member Speech_SegmentationSilenceTimeoutMs can be adjusted to modify the required silence duration for ending a phrase,
+	     * and @member Speech_SegmentationMaximumTimeMs can be adjusted to set the maximum length of a spoken phrase.
+	     * - The Semantic strategy does not have any adjustable properties.
+	     *
+	     * Added in version 1.42.0.
+	     */
+	    PropertyId[PropertyId["Speech_SegmentationStrategy"] = 34] = "Speech_SegmentationStrategy";
+	    /**
 	     * A boolean value specifying whether audio logging is enabled in the service or not.
 	     * Audio and content logs are stored either in Microsoft-owned storage, or in your own storage account linked
 	     * to your Cognitive Services subscription (Bring Your Own Storage (BYOS) enabled Speech resource).
 	     * The logs will be removed after 30 days.
 	     * Added in version 1.7.0
 	     */
-	    PropertyId[PropertyId["SpeechServiceConnection_EnableAudioLogging"] = 33] = "SpeechServiceConnection_EnableAudioLogging";
+	    PropertyId[PropertyId["SpeechServiceConnection_EnableAudioLogging"] = 35] = "SpeechServiceConnection_EnableAudioLogging";
 	    /**
 	     * The speech service connection language identifier mode.
 	     * Can be "AtStart" (the default), or "Continuous". See Language
@@ -22067,68 +22271,68 @@ var PropertyId = {};
 	     * for more details.
 	     * Added in 1.25.0
 	     **/
-	    PropertyId[PropertyId["SpeechServiceConnection_LanguageIdMode"] = 34] = "SpeechServiceConnection_LanguageIdMode";
+	    PropertyId[PropertyId["SpeechServiceConnection_LanguageIdMode"] = 36] = "SpeechServiceConnection_LanguageIdMode";
 	    /**
 	     * A string value representing the desired endpoint version to target for Speech Recognition.
 	     * Added in version 1.21.0
 	     */
-	    PropertyId[PropertyId["SpeechServiceConnection_RecognitionEndpointVersion"] = 35] = "SpeechServiceConnection_RecognitionEndpointVersion";
+	    PropertyId[PropertyId["SpeechServiceConnection_RecognitionEndpointVersion"] = 37] = "SpeechServiceConnection_RecognitionEndpointVersion";
 	    /**
 	    /**
 	     * A string value the current speaker recognition scenario/mode (TextIndependentIdentification, etc.).
 	     * Added in version 1.23.0
 	     */
-	    PropertyId[PropertyId["SpeechServiceConnection_SpeakerIdMode"] = 36] = "SpeechServiceConnection_SpeakerIdMode";
+	    PropertyId[PropertyId["SpeechServiceConnection_SpeakerIdMode"] = 38] = "SpeechServiceConnection_SpeakerIdMode";
 	    /**
 	     * The requested Cognitive Services Speech Service response output profanity setting.
 	     * Allowed values are "masked", "removed", and "raw".
 	     * Added in version 1.7.0.
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_ProfanityOption"] = 37] = "SpeechServiceResponse_ProfanityOption";
+	    PropertyId[PropertyId["SpeechServiceResponse_ProfanityOption"] = 39] = "SpeechServiceResponse_ProfanityOption";
 	    /**
 	     * A string value specifying which post processing option should be used by service.
 	     * Allowed values are "TrueText".
 	     * Added in version 1.7.0
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_PostProcessingOption"] = 38] = "SpeechServiceResponse_PostProcessingOption";
+	    PropertyId[PropertyId["SpeechServiceResponse_PostProcessingOption"] = 40] = "SpeechServiceResponse_PostProcessingOption";
 	    /**
 	     * A boolean value specifying whether to include word-level timestamps in the response result.
 	     * Added in version 1.7.0
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_RequestWordLevelTimestamps"] = 39] = "SpeechServiceResponse_RequestWordLevelTimestamps";
+	    PropertyId[PropertyId["SpeechServiceResponse_RequestWordLevelTimestamps"] = 41] = "SpeechServiceResponse_RequestWordLevelTimestamps";
 	    /**
 	     * The number of times a word has to be in partial results to be returned.
 	     * Added in version 1.7.0
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_StablePartialResultThreshold"] = 40] = "SpeechServiceResponse_StablePartialResultThreshold";
+	    PropertyId[PropertyId["SpeechServiceResponse_StablePartialResultThreshold"] = 42] = "SpeechServiceResponse_StablePartialResultThreshold";
 	    /**
 	     * A string value specifying the output format option in the response result. Internal use only.
 	     * Added in version 1.7.0.
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_OutputFormatOption"] = 41] = "SpeechServiceResponse_OutputFormatOption";
+	    PropertyId[PropertyId["SpeechServiceResponse_OutputFormatOption"] = 43] = "SpeechServiceResponse_OutputFormatOption";
 	    /**
 	     * A boolean value to request for stabilizing translation partial results by omitting words in the end.
 	     * Added in version 1.7.0.
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_TranslationRequestStablePartialResult"] = 42] = "SpeechServiceResponse_TranslationRequestStablePartialResult";
+	    PropertyId[PropertyId["SpeechServiceResponse_TranslationRequestStablePartialResult"] = 44] = "SpeechServiceResponse_TranslationRequestStablePartialResult";
 	    /**
 	     * A boolean value specifying whether to request WordBoundary events.
 	     * @member PropertyId.SpeechServiceResponse_RequestWordBoundary
 	     * Added in version 1.21.0.
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_RequestWordBoundary"] = 43] = "SpeechServiceResponse_RequestWordBoundary";
+	    PropertyId[PropertyId["SpeechServiceResponse_RequestWordBoundary"] = 45] = "SpeechServiceResponse_RequestWordBoundary";
 	    /**
 	     * A boolean value specifying whether to request punctuation boundary in WordBoundary Events. Default is true.
 	     * @member PropertyId.SpeechServiceResponse_RequestPunctuationBoundary
 	     * Added in version 1.21.0.
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_RequestPunctuationBoundary"] = 44] = "SpeechServiceResponse_RequestPunctuationBoundary";
+	    PropertyId[PropertyId["SpeechServiceResponse_RequestPunctuationBoundary"] = 46] = "SpeechServiceResponse_RequestPunctuationBoundary";
 	    /**
 	     * A boolean value specifying whether to request sentence boundary in WordBoundary Events. Default is false.
 	     * @member PropertyId.SpeechServiceResponse_RequestSentenceBoundary
 	     * Added in version 1.21.0.
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_RequestSentenceBoundary"] = 45] = "SpeechServiceResponse_RequestSentenceBoundary";
+	    PropertyId[PropertyId["SpeechServiceResponse_RequestSentenceBoundary"] = 47] = "SpeechServiceResponse_RequestSentenceBoundary";
 	    /**
 	     * Determines if intermediate results contain speaker identification.
 	     * Allowed values are "true" or "false". If set to "true", the intermediate results will contain speaker identification.
@@ -22137,80 +22341,80 @@ var PropertyId = {};
 	     * @member PropertyId.SpeechServiceResponse_DiarizeIntermediateResults
 	     * Adding in version 1.41.
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_DiarizeIntermediateResults"] = 46] = "SpeechServiceResponse_DiarizeIntermediateResults";
+	    PropertyId[PropertyId["SpeechServiceResponse_DiarizeIntermediateResults"] = 48] = "SpeechServiceResponse_DiarizeIntermediateResults";
 	    /**
 	     * Identifier used to connect to the backend service.
 	     * @member PropertyId.Conversation_ApplicationId
 	     */
-	    PropertyId[PropertyId["Conversation_ApplicationId"] = 47] = "Conversation_ApplicationId";
+	    PropertyId[PropertyId["Conversation_ApplicationId"] = 49] = "Conversation_ApplicationId";
 	    /**
 	     * Type of dialog backend to connect to.
 	     * @member PropertyId.Conversation_DialogType
 	     */
-	    PropertyId[PropertyId["Conversation_DialogType"] = 48] = "Conversation_DialogType";
+	    PropertyId[PropertyId["Conversation_DialogType"] = 50] = "Conversation_DialogType";
 	    /**
 	     * Silence timeout for listening
 	     * @member PropertyId.Conversation_Initial_Silence_Timeout
 	     */
-	    PropertyId[PropertyId["Conversation_Initial_Silence_Timeout"] = 49] = "Conversation_Initial_Silence_Timeout";
+	    PropertyId[PropertyId["Conversation_Initial_Silence_Timeout"] = 51] = "Conversation_Initial_Silence_Timeout";
 	    /**
 	     * From Id to add to speech recognition activities.
 	     * @member PropertyId.Conversation_From_Id
 	     */
-	    PropertyId[PropertyId["Conversation_From_Id"] = 50] = "Conversation_From_Id";
+	    PropertyId[PropertyId["Conversation_From_Id"] = 52] = "Conversation_From_Id";
 	    /**
 	     * ConversationId for the session.
 	     * @member PropertyId.Conversation_Conversation_Id
 	     */
-	    PropertyId[PropertyId["Conversation_Conversation_Id"] = 51] = "Conversation_Conversation_Id";
+	    PropertyId[PropertyId["Conversation_Conversation_Id"] = 53] = "Conversation_Conversation_Id";
 	    /**
 	     * Comma separated list of custom voice deployment ids.
 	     * @member PropertyId.Conversation_Custom_Voice_Deployment_Ids
 	     */
-	    PropertyId[PropertyId["Conversation_Custom_Voice_Deployment_Ids"] = 52] = "Conversation_Custom_Voice_Deployment_Ids";
+	    PropertyId[PropertyId["Conversation_Custom_Voice_Deployment_Ids"] = 54] = "Conversation_Custom_Voice_Deployment_Ids";
 	    /**
 	     * Speech activity template, stamp properties from the template on the activity generated by the service for speech.
 	     * @member PropertyId.Conversation_Speech_Activity_Template
 	     * Added in version 1.10.0.
 	     */
-	    PropertyId[PropertyId["Conversation_Speech_Activity_Template"] = 53] = "Conversation_Speech_Activity_Template";
+	    PropertyId[PropertyId["Conversation_Speech_Activity_Template"] = 55] = "Conversation_Speech_Activity_Template";
 	    /**
 	     * Enables or disables the receipt of turn status messages as obtained on the turnStatusReceived event.
 	     * @member PropertyId.Conversation_Request_Bot_Status_Messages
 	     * Added in version 1.15.0.
 	     */
-	    PropertyId[PropertyId["Conversation_Request_Bot_Status_Messages"] = 54] = "Conversation_Request_Bot_Status_Messages";
+	    PropertyId[PropertyId["Conversation_Request_Bot_Status_Messages"] = 56] = "Conversation_Request_Bot_Status_Messages";
 	    /**
 	     * Specifies the connection ID to be provided in the Agent configuration message, e.g. a Direct Line token for
 	     * channel authentication.
 	     * Added in version 1.15.1.
 	     */
-	    PropertyId[PropertyId["Conversation_Agent_Connection_Id"] = 55] = "Conversation_Agent_Connection_Id";
+	    PropertyId[PropertyId["Conversation_Agent_Connection_Id"] = 57] = "Conversation_Agent_Connection_Id";
 	    /**
 	     * The Cognitive Services Speech Service host (url). Under normal circumstances, you shouldn't have to use this property directly.
 	     * Instead, use [[SpeechConfig.fromHost]].
 	     */
-	    PropertyId[PropertyId["SpeechServiceConnection_Host"] = 56] = "SpeechServiceConnection_Host";
+	    PropertyId[PropertyId["SpeechServiceConnection_Host"] = 58] = "SpeechServiceConnection_Host";
 	    /**
 	     * Set the host for service calls to the Conversation Translator REST management and websocket calls.
 	     */
-	    PropertyId[PropertyId["ConversationTranslator_Host"] = 57] = "ConversationTranslator_Host";
+	    PropertyId[PropertyId["ConversationTranslator_Host"] = 59] = "ConversationTranslator_Host";
 	    /**
 	     * Optionally set the the host's display name.
 	     * Used when joining a conversation.
 	     */
-	    PropertyId[PropertyId["ConversationTranslator_Name"] = 58] = "ConversationTranslator_Name";
+	    PropertyId[PropertyId["ConversationTranslator_Name"] = 60] = "ConversationTranslator_Name";
 	    /**
 	     * Optionally set a value for the X-CorrelationId request header.
 	     * Used for troubleshooting errors in the server logs. It should be a valid guid.
 	     */
-	    PropertyId[PropertyId["ConversationTranslator_CorrelationId"] = 59] = "ConversationTranslator_CorrelationId";
+	    PropertyId[PropertyId["ConversationTranslator_CorrelationId"] = 61] = "ConversationTranslator_CorrelationId";
 	    /**
 	     * Set the conversation token to be sent to the speech service. This enables the
 	     * service to service call from the speech service to the Conversation Translator service for relaying
 	     * recognitions. For internal use.
 	     */
-	    PropertyId[PropertyId["ConversationTranslator_Token"] = 60] = "ConversationTranslator_Token";
+	    PropertyId[PropertyId["ConversationTranslator_Token"] = 62] = "ConversationTranslator_Token";
 	    /**
 	     * The reference text of the audio for pronunciation evaluation.
 	     * For this and the following pronunciation assessment parameters, see
@@ -22218,19 +22422,19 @@ var PropertyId = {};
 	     * Under normal circumstances, you shouldn't have to use this property directly.
 	     * Added in version 1.15.0
 	     */
-	    PropertyId[PropertyId["PronunciationAssessment_ReferenceText"] = 61] = "PronunciationAssessment_ReferenceText";
+	    PropertyId[PropertyId["PronunciationAssessment_ReferenceText"] = 63] = "PronunciationAssessment_ReferenceText";
 	    /**
 	     * The point system for pronunciation score calibration (FivePoint or HundredMark).
 	     * Under normal circumstances, you shouldn't have to use this property directly.
 	     * Added in version 1.15.0
 	     */
-	    PropertyId[PropertyId["PronunciationAssessment_GradingSystem"] = 62] = "PronunciationAssessment_GradingSystem";
+	    PropertyId[PropertyId["PronunciationAssessment_GradingSystem"] = 64] = "PronunciationAssessment_GradingSystem";
 	    /**
 	     * The pronunciation evaluation granularity (Phoneme, Word, or FullText).
 	     * Under normal circumstances, you shouldn't have to use this property directly.
 	     * Added in version 1.15.0
 	     */
-	    PropertyId[PropertyId["PronunciationAssessment_Granularity"] = 63] = "PronunciationAssessment_Granularity";
+	    PropertyId[PropertyId["PronunciationAssessment_Granularity"] = 65] = "PronunciationAssessment_Granularity";
 	    /**
 	     * Defines if enable miscue calculation.
 	     * With this enabled, the pronounced words will be compared to the reference text,
@@ -22238,36 +22442,36 @@ var PropertyId = {};
 	     * Under normal circumstances, you shouldn't have to use this property directly.
 	     * Added in version 1.15.0
 	     */
-	    PropertyId[PropertyId["PronunciationAssessment_EnableMiscue"] = 64] = "PronunciationAssessment_EnableMiscue";
+	    PropertyId[PropertyId["PronunciationAssessment_EnableMiscue"] = 66] = "PronunciationAssessment_EnableMiscue";
 	    /**
 	     * The json string of pronunciation assessment parameters
 	     * Under normal circumstances, you shouldn't have to use this property directly.
 	     * Added in version 1.15.0
 	     */
-	    PropertyId[PropertyId["PronunciationAssessment_Json"] = 65] = "PronunciationAssessment_Json";
+	    PropertyId[PropertyId["PronunciationAssessment_Json"] = 67] = "PronunciationAssessment_Json";
 	    /**
 	     * Pronunciation assessment parameters.
 	     * This property is intended to be read-only. The SDK is using it internally.
 	     * Added in version 1.15.0
 	     */
-	    PropertyId[PropertyId["PronunciationAssessment_Params"] = 66] = "PronunciationAssessment_Params";
+	    PropertyId[PropertyId["PronunciationAssessment_Params"] = 68] = "PronunciationAssessment_Params";
 	    /**
 	     * Version of Speaker Recognition API to use.
 	     * Added in version 1.18.0
 	     */
-	    PropertyId[PropertyId["SpeakerRecognition_Api_Version"] = 67] = "SpeakerRecognition_Api_Version";
+	    PropertyId[PropertyId["SpeakerRecognition_Api_Version"] = 69] = "SpeakerRecognition_Api_Version";
 	    /**
 	     * Specifies whether to allow load of data URL for web worker
 	     * Allowed values are "off" and "on". Default is "on".
 	     * Added in version 1.32.0
 	     */
-	    PropertyId[PropertyId["WebWorkerLoadType"] = 68] = "WebWorkerLoadType";
+	    PropertyId[PropertyId["WebWorkerLoadType"] = 70] = "WebWorkerLoadType";
 	    /**
 	     * Talking avatar service WebRTC session description protocol.
 	     * This property is intended to be read-only. The SDK is using it internally.
 	     * Added in version 1.33.0
 	     */
-	    PropertyId[PropertyId["TalkingAvatarService_WebRTC_SDP"] = 69] = "TalkingAvatarService_WebRTC_SDP";
+	    PropertyId[PropertyId["TalkingAvatarService_WebRTC_SDP"] = 71] = "TalkingAvatarService_WebRTC_SDP";
 	})(exports.PropertyId || (exports.PropertyId = {}));
 
 	
@@ -23623,7 +23827,7 @@ function requireNoMatchDetails () {
 	     * @returns {NoMatchDetails} The no match details object being created.
 	     */
 	    static fromResult(result) {
-	        const simpleSpeech = Exports_js_1.SimpleSpeechPhrase.fromJSON(result.json);
+	        const simpleSpeech = Exports_js_1.SimpleSpeechPhrase.fromJSON(result.json, 0); // Offset fixups are already done.
 	        let reason = Exports_js_2.NoMatchReason.NotRecognized;
 	        switch (simpleSpeech.RecognitionStatus) {
 	            case Exports_js_1.RecognitionStatus.BabbleTimeout:
@@ -23884,7 +24088,7 @@ function requireCancellationDetails () {
 	        let reason = Exports_js_2.CancellationReason.Error;
 	        let errorCode = Exports_js_2.CancellationErrorCode.NoError;
 	        if (result instanceof Exports_js_2.RecognitionResult && !!result.json) {
-	            const simpleSpeech = Exports_js_1.SimpleSpeechPhrase.fromJSON(result.json);
+	            const simpleSpeech = Exports_js_1.SimpleSpeechPhrase.fromJSON(result.json, 0); // Offset fixups are already done.
 	            reason = Exports_js_1.EnumTranslation.implTranslateCancelResult(simpleSpeech.RecognitionStatus);
 	        }
 	        if (!!result.properties) {
@@ -24482,6 +24686,8 @@ QueryParameterNames.EnableLanguageId = "lidEnabled";
 QueryParameterNames.EnableWordLevelTimestamps = "wordLevelTimestamps";
 QueryParameterNames.EndSilenceTimeoutMs = "endSilenceTimeoutMs";
 QueryParameterNames.SegmentationSilenceTimeoutMs = "segmentationSilenceTimeoutMs";
+QueryParameterNames.SegmentationMaximumTimeMs = "segmentationMaximumTimeMs";
+QueryParameterNames.SegmentationStrategy = "segmentationStrategy";
 QueryParameterNames.Format = "format";
 QueryParameterNames.InitialSilenceTimeoutMs = "initialSilenceTimeoutMs";
 QueryParameterNames.Language = "language";
@@ -25934,10 +26140,10 @@ function requireAutoDetectSourceLanguageConfig () {
 	     * @member AutoDetectSourceLanguageConfig.fromOpenRange
 	     * @function
 	     * @public
-	     * Only [[SpeechSynthesizer]] supports source language auto detection from open range,
-	     * for [[Recognizer]], please use AutoDetectSourceLanguageConfig with specific source languages.
 	     * @return {AutoDetectSourceLanguageConfig} Instance of AutoDetectSourceLanguageConfig
 	     * @summary Creates an instance of the AutoDetectSourceLanguageConfig with open range.
+	     * Only [[SpeechSynthesizer]] supports source language auto detection from open range,
+	     * for [[Recognizer]], please use AutoDetectSourceLanguageConfig with specific source languages.
 	     */
 	    static fromOpenRange() {
 	        const config = new AutoDetectSourceLanguageConfig();
@@ -30472,15 +30678,39 @@ var VoiceInfo = {};
 	})(SynthesisVoiceGender = exports.SynthesisVoiceGender || (exports.SynthesisVoiceGender = {}));
 	var SynthesisVoiceType;
 	(function (SynthesisVoiceType) {
+	    /**
+	     * Voice type is not known.
+	     */
+	    SynthesisVoiceType[SynthesisVoiceType["Unknown"] = 0] = "Unknown";
+	    /**
+	     * Online neural voices.
+	     */
 	    SynthesisVoiceType[SynthesisVoiceType["OnlineNeural"] = 1] = "OnlineNeural";
+	    /**
+	     * Online standard voices. These voices are deprecated.
+	     */
 	    SynthesisVoiceType[SynthesisVoiceType["OnlineStandard"] = 2] = "OnlineStandard";
+	    /**
+	     * Offline neural voices.
+	     */
 	    SynthesisVoiceType[SynthesisVoiceType["OfflineNeural"] = 3] = "OfflineNeural";
+	    /**
+	     * Offline standard voices.
+	     */
 	    SynthesisVoiceType[SynthesisVoiceType["OfflineStandard"] = 4] = "OfflineStandard";
+	    /**
+	     * High definition (HD) voices. Refer to https://learn.microsoft.com/azure/ai-services/speech-service/high-definition-voices
+	     */
+	    SynthesisVoiceType[SynthesisVoiceType["OnlineNeuralHD"] = 5] = "OnlineNeuralHD";
 	})(SynthesisVoiceType = exports.SynthesisVoiceType || (exports.SynthesisVoiceType = {}));
 	const GENDER_LOOKUP = {
 	    [SynthesisVoiceGender[SynthesisVoiceGender.Neutral]]: SynthesisVoiceGender.Neutral,
 	    [SynthesisVoiceGender[SynthesisVoiceGender.Male]]: SynthesisVoiceGender.Male,
 	    [SynthesisVoiceGender[SynthesisVoiceGender.Female]]: SynthesisVoiceGender.Female,
+	};
+	const VOICE_TYPE_LOOKUP = {
+	    Neural: SynthesisVoiceType.OnlineNeural,
+	    NeuralHD: SynthesisVoiceType.OnlineNeuralHD,
 	};
 	/**
 	 * Information about Speech Synthesis voice
@@ -30497,7 +30727,7 @@ var VoiceInfo = {};
 	            this.privLocaleName = json.LocaleName;
 	            this.privDisplayName = json.DisplayName;
 	            this.privLocalName = json.LocalName;
-	            this.privVoiceType = json.VoiceType.endsWith("Standard") ? SynthesisVoiceType.OnlineStandard : SynthesisVoiceType.OnlineNeural;
+	            this.privVoiceType = VOICE_TYPE_LOOKUP[json.VoiceType] || SynthesisVoiceType.Unknown;
 	            this.privGender = GENDER_LOOKUP[json.Gender] || SynthesisVoiceGender.Unknown;
 	            if (!!json.StyleList && Array.isArray(json.StyleList)) {
 	                for (const style of json.StyleList) {
@@ -30516,6 +30746,9 @@ var VoiceInfo = {};
 	            }
 	            if (Array.isArray(json.RolePlayList)) {
 	                this.privRolePlayList = [...json.RolePlayList];
+	            }
+	            if (json.VoiceTag) {
+	                this.privVoiceTag = json.VoiceTag;
 	            }
 	        }
 	    }
@@ -30564,6 +30797,9 @@ var VoiceInfo = {};
 	    }
 	    get rolePlayList() {
 	        return this.privRolePlayList;
+	    }
+	    get voiceTag() {
+	        return this.privVoiceTag;
 	    }
 	}
 	exports.VoiceInfo = VoiceInfo;
@@ -31325,6 +31561,7 @@ function requireAvatarConfig () {
 	     */
 	    constructor(character, style, videoFormat) {
 	        this.privCustomized = false;
+	        this.privUseBuiltInVoice = false;
 	        Contracts_js_1.Contracts.throwIfNullOrWhitespace(character, "character");
 	        this.character = character;
 	        this.style = style;
@@ -31344,6 +31581,18 @@ function requireAvatarConfig () {
 	     */
 	    set customized(value) {
 	        this.privCustomized = value;
+	    }
+	    /**
+	     * Indicates whether to use built-in voice for custom avatar.
+	     */
+	    get useBuiltInVoice() {
+	        return this.privUseBuiltInVoice;
+	    }
+	    /**
+	     * Sets whether to use built-in voice for custom avatar.
+	     */
+	    set useBuiltInVoice(value) {
+	        this.privUseBuiltInVoice = value;
 	    }
 	    /**
 	     * Gets the background color.
@@ -32064,6 +32313,8 @@ function requireExports$3 () {
 		var SynthesisVoicesResult_js_1 = requireSynthesisVoicesResult();
 		Object.defineProperty(exports, "SynthesisVoicesResult", { enumerable: true, get: function () { return SynthesisVoicesResult_js_1.SynthesisVoicesResult; } });
 		var VoiceInfo_js_1 = VoiceInfo;
+		Object.defineProperty(exports, "SynthesisVoiceGender", { enumerable: true, get: function () { return VoiceInfo_js_1.SynthesisVoiceGender; } });
+		Object.defineProperty(exports, "SynthesisVoiceType", { enumerable: true, get: function () { return VoiceInfo_js_1.SynthesisVoiceType; } });
 		Object.defineProperty(exports, "VoiceInfo", { enumerable: true, get: function () { return VoiceInfo_js_1.VoiceInfo; } });
 		var SpeakerAudioDestination_js_1 = SpeakerAudioDestination$1;
 		Object.defineProperty(exports, "SpeakerAudioDestination", { enumerable: true, get: function () { return SpeakerAudioDestination_js_1.SpeakerAudioDestination; } });
@@ -32978,19 +33229,48 @@ function requireServiceRecognizerBase () {
 	        }
 	    }
 	    setSpeechSegmentationTimeoutJson() {
-	        const speechSegmentationTimeout = this.privRecognizerConfig.parameters.getProperty(Exports_js_3.PropertyId.Speech_SegmentationSilenceTimeoutMs, undefined);
-	        if (speechSegmentationTimeout !== undefined) {
-	            const mode = this.recognitionMode === Exports_js_4.RecognitionMode.Conversation ? "CONVERSATION" :
+	        const speechSegmentationSilenceTimeoutMs = this.privRecognizerConfig.parameters.getProperty(Exports_js_3.PropertyId.Speech_SegmentationSilenceTimeoutMs, undefined);
+	        const speechSegmentationMaximumTimeMs = this.privRecognizerConfig.parameters.getProperty(Exports_js_3.PropertyId.Speech_SegmentationMaximumTimeMs, undefined);
+	        const speechSegmentationStrategy = this.privRecognizerConfig.parameters.getProperty(Exports_js_3.PropertyId.Speech_SegmentationStrategy, undefined);
+	        const segmentation = {
+	            segmentation: {
+	                mode: ""
+	            }
+	        };
+	        let configuredSegment = false;
+	        if (speechSegmentationStrategy !== undefined) {
+	            configuredSegment = true;
+	            let segMode = "";
+	            switch (speechSegmentationStrategy.toLowerCase()) {
+	                case "default":
+	                    break;
+	                case "time":
+	                    segMode = "Custom";
+	                    break;
+	                case "semantic":
+	                    segMode = "Semantic";
+	                    break;
+	            }
+	            segmentation.segmentation.mode = segMode;
+	        }
+	        if (speechSegmentationSilenceTimeoutMs !== undefined) {
+	            configuredSegment = true;
+	            const segmentationSilenceTimeoutMs = parseInt(speechSegmentationSilenceTimeoutMs, 10);
+	            segmentation.segmentation.mode = "Custom";
+	            segmentation.segmentation.segmentationSilenceTimeoutMs = segmentationSilenceTimeoutMs;
+	        }
+	        if (speechSegmentationMaximumTimeMs !== undefined) {
+	            configuredSegment = true;
+	            const segmentationMaximumTimeMs = parseInt(speechSegmentationMaximumTimeMs, 10);
+	            segmentation.segmentation.mode = "Custom";
+	            segmentation.segmentation.segmentationForcedTimeoutMs = segmentationMaximumTimeMs;
+	        }
+	        if (configuredSegment) {
+	            const recoMode = this.recognitionMode === Exports_js_4.RecognitionMode.Conversation ? "CONVERSATION" :
 	                this.recognitionMode === Exports_js_4.RecognitionMode.Dictation ? "DICTATION" : "INTERACTIVE";
-	            const segmentationSilenceTimeoutMs = parseInt(speechSegmentationTimeout, 10);
 	            const phraseDetection = this.privSpeechContext.getSection("phraseDetection");
-	            phraseDetection.mode = mode;
-	            phraseDetection[mode] = {
-	                segmentation: {
-	                    mode: "Custom",
-	                    segmentationSilenceTimeoutMs
-	                }
-	            };
+	            phraseDetection.mode = recoMode;
+	            phraseDetection[recoMode] = segmentation;
 	            this.privSpeechContext.setSection("phraseDetection", phraseDetection);
 	        }
 	    }
@@ -33275,7 +33555,7 @@ function requireServiceRecognizerBase () {
 	                        this.privRequestSession.onServiceTurnStartResponse();
 	                        break;
 	                    case "speech.startdetected":
-	                        const speechStartDetected = Exports_js_4.SpeechDetected.fromJSON(connectionMessage.textBody);
+	                        const speechStartDetected = Exports_js_4.SpeechDetected.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
 	                        const speechStartEventArgs = new Exports_js_3.RecognitionEventArgs(speechStartDetected.Offset, this.privRequestSession.sessionId);
 	                        if (!!this.privRecognizer.speechStartDetected) {
 	                            this.privRecognizer.speechStartDetected(this.privRecognizer, speechStartEventArgs);
@@ -33290,7 +33570,7 @@ function requireServiceRecognizerBase () {
 	                            // If the request was empty, the JSON returned is empty.
 	                            json = "{ Offset: 0 }";
 	                        }
-	                        const speechStopDetected = Exports_js_4.SpeechDetected.fromJSON(json);
+	                        const speechStopDetected = Exports_js_4.SpeechDetected.fromJSON(json, this.privRequestSession.currentTurnAudioOffset);
 	                        const speechStopEventArgs = new Exports_js_3.RecognitionEventArgs(speechStopDetected.Offset + this.privRequestSession.currentTurnAudioOffset, this.privRequestSession.sessionId);
 	                        if (!!this.privRecognizer.speechEndDetected) {
 	                            this.privRecognizer.speechEndDetected(this.privRecognizer, speechStopEventArgs);
@@ -33642,42 +33922,36 @@ function requireConversationServiceRecognizer () {
 	    cancelRecognition(sessionId, requestId, cancellationReason, errorCode, error) {
 	    }
 	    async handleSpeechPhrase(textBody) {
-	        const simple = Exports_js_2.SimpleSpeechPhrase.fromJSON(textBody);
+	        const simple = Exports_js_2.SimpleSpeechPhrase.fromJSON(textBody, this.privRequestSession.currentTurnAudioOffset);
 	        const resultReason = Exports_js_2.EnumTranslation.implTranslateRecognitionResult(simple.RecognitionStatus);
 	        let result;
 	        const resultProps = new Exports_js_1.PropertyCollection();
 	        resultProps.setProperty(Exports_js_1.PropertyId.SpeechServiceResponse_JsonResult, textBody);
-	        const simpleOffset = simple.Offset + this.privRequestSession.currentTurnAudioOffset;
-	        let offset = simpleOffset;
-	        this.privRequestSession.onPhraseRecognized(this.privRequestSession.currentTurnAudioOffset + simple.Offset + simple.Duration);
+	        this.privRequestSession.onPhraseRecognized(simple.Offset + simple.Duration);
 	        if (Exports_js_1.ResultReason.Canceled === resultReason) {
 	            const cancelReason = Exports_js_2.EnumTranslation.implTranslateCancelResult(simple.RecognitionStatus);
 	            const cancellationErrorCode = Exports_js_2.EnumTranslation.implTranslateCancelErrorCode(simple.RecognitionStatus);
 	            await this.cancelRecognitionLocal(cancelReason, cancellationErrorCode, Exports_js_2.EnumTranslation.implTranslateErrorDetails(cancellationErrorCode));
 	        }
 	        else {
-	            if (!(this.privRequestSession.isSpeechEnded && resultReason === Exports_js_1.ResultReason.NoMatch && simple.RecognitionStatus !== Exports_js_2.RecognitionStatus.InitialSilenceTimeout)) {
+	            if (simple.RecognitionStatus !== Exports_js_2.RecognitionStatus.EndOfDictation) {
 	                if (this.privRecognizerConfig.parameters.getProperty(Exports_js_2.OutputFormatPropertyName) === Exports_js_1.OutputFormat[Exports_js_1.OutputFormat.Simple]) {
-	                    result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, simple.DisplayText, simple.Duration, simpleOffset, simple.Language, simple.LanguageDetectionConfidence, simple.SpeakerId, undefined, textBody, resultProps);
+	                    result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, simple.DisplayText, simple.Duration, simple.Offset, simple.Language, simple.LanguageDetectionConfidence, simple.SpeakerId, undefined, simple.asJson(), resultProps);
 	                }
 	                else {
-	                    const detailed = Exports_js_2.DetailedSpeechPhrase.fromJSON(textBody);
-	                    const totalOffset = detailed.Offset + this.privRequestSession.currentTurnAudioOffset;
-	                    const offsetCorrectedJson = detailed.getJsonWithCorrectedOffsets(totalOffset);
-	                    result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, detailed.Text, detailed.Duration, totalOffset, detailed.Language, detailed.LanguageDetectionConfidence, detailed.SpeakerId, undefined, offsetCorrectedJson, resultProps);
-	                    offset = result.offset;
+	                    const detailed = Exports_js_2.DetailedSpeechPhrase.fromJSON(textBody, this.privRequestSession.currentTurnAudioOffset);
+	                    result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, detailed.Text, detailed.Duration, detailed.Offset, detailed.Language, detailed.LanguageDetectionConfidence, detailed.SpeakerId, undefined, detailed.asJson(), resultProps);
 	                }
-	                this.handleRecognizedCallback(result, offset, this.privRequestSession.sessionId);
+	                this.handleRecognizedCallback(result, result.offset, this.privRequestSession.sessionId);
 	            }
 	        }
 	    }
 	    handleSpeechHypothesis(textBody) {
-	        const hypothesis = Exports_js_2.SpeechHypothesis.fromJSON(textBody);
-	        const offset = hypothesis.Offset + this.privRequestSession.currentTurnAudioOffset;
+	        const hypothesis = Exports_js_2.SpeechHypothesis.fromJSON(textBody, this.privRequestSession.currentTurnAudioOffset);
 	        const resultProps = new Exports_js_1.PropertyCollection();
 	        resultProps.setProperty(Exports_js_1.PropertyId.SpeechServiceResponse_JsonResult, textBody);
-	        const result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, Exports_js_1.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, hypothesis.SpeakerId, undefined, textBody, resultProps);
-	        this.privRequestSession.onHypothesis(offset);
+	        const result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, Exports_js_1.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, hypothesis.Offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, hypothesis.SpeakerId, undefined, hypothesis.asJson(), resultProps);
+	        this.privRequestSession.onHypothesis(hypothesis.Offset);
 	        this.handleRecognizingCallback(result, hypothesis.Duration, this.privRequestSession.sessionId);
 	    }
 	};
@@ -34427,19 +34701,20 @@ TranslationHypothesis$1.TranslationHypothesis = void 0;
 const Contracts_js_1 = Contracts$1;
 const TranslationStatus_js_1 = TranslationStatus;
 class TranslationHypothesis {
-    constructor(hypothesis) {
+    constructor(hypothesis, baseOffset) {
         this.privTranslationHypothesis = hypothesis;
-        this.privTranslationHypothesis.Translation.TranslationStatus = TranslationStatus_js_1.TranslationStatus[this.privTranslationHypothesis.Translation.TranslationStatus];
+        this.privTranslationHypothesis.Offset += baseOffset;
+        this.privTranslationHypothesis.Translation.TranslationStatus = this.mapTranslationStatus(this.privTranslationHypothesis.Translation.TranslationStatus);
     }
-    static fromJSON(json) {
-        return new TranslationHypothesis(JSON.parse(json));
+    static fromJSON(json, baseOffset) {
+        return new TranslationHypothesis(JSON.parse(json), baseOffset);
     }
-    static fromTranslationResponse(translationHypothesis) {
+    static fromTranslationResponse(translationHypothesis, baseOffset) {
         Contracts_js_1.Contracts.throwIfNullOrUndefined(translationHypothesis, "translationHypothesis");
         const hypothesis = translationHypothesis.SpeechHypothesis;
         translationHypothesis.SpeechHypothesis = undefined;
         hypothesis.Translation = translationHypothesis;
-        return new TranslationHypothesis(hypothesis);
+        return new TranslationHypothesis(hypothesis, baseOffset);
     }
     get Duration() {
         return this.privTranslationHypothesis.Duration;
@@ -34455,6 +34730,22 @@ class TranslationHypothesis {
     }
     get Language() {
         return this.privTranslationHypothesis.PrimaryLanguage?.Language;
+    }
+    asJson() {
+        const jsonObj = { ...this.privTranslationHypothesis };
+        // Convert the enum value to its string representation for serialization purposes.
+        return jsonObj.Translation !== undefined ? JSON.stringify({
+            ...jsonObj,
+            TranslationStatus: TranslationStatus_js_1.TranslationStatus[jsonObj.Translation.TranslationStatus]
+        }) : JSON.stringify(jsonObj);
+    }
+    mapTranslationStatus(status) {
+        if (typeof status === "string") {
+            return TranslationStatus_js_1.TranslationStatus[status];
+        }
+        else if (typeof status === "number") {
+            return status;
+        }
     }
 }
 TranslationHypothesis$1.TranslationHypothesis = TranslationHypothesis;
@@ -34474,23 +34765,24 @@ function requireTranslationPhrase () {
 	const Exports_js_1 = requireExports();
 	const TranslationStatus_js_1 = TranslationStatus;
 	let TranslationPhrase$1 = class TranslationPhrase {
-	    constructor(phrase) {
+	    constructor(phrase, baseOffset) {
 	        this.privTranslationPhrase = phrase;
-	        this.privTranslationPhrase.RecognitionStatus = Exports_js_1.RecognitionStatus[this.privTranslationPhrase.RecognitionStatus];
+	        this.privTranslationPhrase.Offset += baseOffset;
+	        this.privTranslationPhrase.RecognitionStatus = this.mapRecognitionStatus(this.privTranslationPhrase.RecognitionStatus);
 	        if (this.privTranslationPhrase.Translation !== undefined) {
-	            this.privTranslationPhrase.Translation.TranslationStatus = TranslationStatus_js_1.TranslationStatus[this.privTranslationPhrase.Translation.TranslationStatus];
+	            this.privTranslationPhrase.Translation.TranslationStatus = this.mapTranslationStatus(this.privTranslationPhrase.Translation.TranslationStatus);
 	        }
 	    }
-	    static fromJSON(json) {
-	        return new TranslationPhrase(JSON.parse(json));
+	    static fromJSON(json, baseOffset) {
+	        return new TranslationPhrase(JSON.parse(json), baseOffset);
 	    }
-	    static fromTranslationResponse(translationResponse) {
+	    static fromTranslationResponse(translationResponse, baseOffset) {
 	        Contracts_js_1.Contracts.throwIfNullOrUndefined(translationResponse, "translationResponse");
 	        const phrase = translationResponse.SpeechPhrase;
 	        translationResponse.SpeechPhrase = undefined;
 	        phrase.Translation = translationResponse;
 	        phrase.Text = phrase.DisplayText;
-	        return new TranslationPhrase(phrase);
+	        return new TranslationPhrase(phrase, baseOffset);
 	    }
 	    get RecognitionStatus() {
 	        return this.privTranslationPhrase.RecognitionStatus;
@@ -34512,6 +34804,38 @@ function requireTranslationPhrase () {
 	    }
 	    get Translation() {
 	        return this.privTranslationPhrase.Translation;
+	    }
+	    asJson() {
+	        const jsonObj = { ...this.privTranslationPhrase };
+	        // Convert the enum values to their string representations for serialization
+	        const serializedObj = {
+	            ...jsonObj,
+	            RecognitionStatus: Exports_js_1.RecognitionStatus[jsonObj.RecognitionStatus]
+	        };
+	        if (jsonObj.Translation) {
+	            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+	            serializedObj.Translation = {
+	                ...jsonObj.Translation,
+	                TranslationStatus: TranslationStatus_js_1.TranslationStatus[jsonObj.Translation.TranslationStatus]
+	            };
+	        }
+	        return JSON.stringify(serializedObj);
+	    }
+	    mapRecognitionStatus(status) {
+	        if (typeof status === "string") {
+	            return Exports_js_1.RecognitionStatus[status];
+	        }
+	        else if (typeof status === "number") {
+	            return status;
+	        }
+	    }
+	    mapTranslationStatus(status) {
+	        if (typeof status === "string") {
+	            return TranslationStatus_js_1.TranslationStatus[status];
+	        }
+	        else if (typeof status === "number") {
+	            return status;
+	        }
 	    }
 	};
 	TranslationPhrase.TranslationPhrase = TranslationPhrase$1;
@@ -34552,7 +34876,8 @@ function requireTranslationServiceRecognizer () {
 	            return true;
 	        }
 	        const handleTranslationPhrase = async (translatedPhrase) => {
-	            this.privRequestSession.onPhraseRecognized(this.privRequestSession.currentTurnAudioOffset + translatedPhrase.Offset + translatedPhrase.Duration);
+	            resultProps.setProperty(Exports_js_2.PropertyId.SpeechServiceResponse_JsonResult, translatedPhrase.asJson());
+	            this.privRequestSession.onPhraseRecognized(translatedPhrase.Offset + translatedPhrase.Duration);
 	            if (translatedPhrase.RecognitionStatus === Exports_js_3.RecognitionStatus.Success) {
 	                // OK, the recognition was successful. How'd the translation do?
 	                const result = this.fireEventForResult(translatedPhrase, resultProps);
@@ -34585,14 +34910,14 @@ function requireTranslationServiceRecognizer () {
 	            }
 	            else {
 	                const reason = Exports_js_3.EnumTranslation.implTranslateRecognitionResult(translatedPhrase.RecognitionStatus);
-	                const result = new Exports_js_2.TranslationRecognitionResult(undefined, this.privRequestSession.requestId, reason, translatedPhrase.Text, translatedPhrase.Duration, this.privRequestSession.currentTurnAudioOffset + translatedPhrase.Offset, translatedPhrase.Language, translatedPhrase.Confidence, undefined, connectionMessage.textBody, resultProps);
+	                const result = new Exports_js_2.TranslationRecognitionResult(undefined, this.privRequestSession.requestId, reason, translatedPhrase.Text, translatedPhrase.Duration, translatedPhrase.Offset, translatedPhrase.Language, translatedPhrase.Confidence, undefined, translatedPhrase.asJson(), resultProps);
 	                if (reason === Exports_js_2.ResultReason.Canceled) {
 	                    const cancelReason = Exports_js_3.EnumTranslation.implTranslateCancelResult(translatedPhrase.RecognitionStatus);
 	                    const cancellationErrorCode = Exports_js_3.EnumTranslation.implTranslateCancelErrorCode(translatedPhrase.RecognitionStatus);
 	                    await this.cancelRecognitionLocal(cancelReason, cancellationErrorCode, Exports_js_3.EnumTranslation.implTranslateErrorDetails(cancellationErrorCode));
 	                }
 	                else {
-	                    if (!(this.privRequestSession.isSpeechEnded && reason === Exports_js_2.ResultReason.NoMatch && translatedPhrase.RecognitionStatus !== Exports_js_3.RecognitionStatus.InitialSilenceTimeout)) {
+	                    if (translatedPhrase.RecognitionStatus !== Exports_js_3.RecognitionStatus.EndOfDictation) {
 	                        const ev = new Exports_js_2.TranslationRecognitionEventArgs(result, result.offset, this.privRequestSession.sessionId);
 	                        if (!!this.privTranslationRecognizer.recognized) {
 	                            try {
@@ -34604,30 +34929,31 @@ function requireTranslationServiceRecognizer () {
 	                                // trip things up.
 	                            }
 	                        }
-	                    }
-	                    // report result to promise.
-	                    if (!!this.privSuccessCallback) {
-	                        try {
-	                            this.privSuccessCallback(result);
-	                        }
-	                        catch (e) {
-	                            if (!!this.privErrorCallback) {
-	                                this.privErrorCallback(e);
+	                        // report result to promise.
+	                        if (!!this.privSuccessCallback) {
+	                            try {
+	                                this.privSuccessCallback(result);
 	                            }
+	                            catch (e) {
+	                                if (!!this.privErrorCallback) {
+	                                    this.privErrorCallback(e);
+	                                }
+	                            }
+	                            // Only invoke the call back once.
+	                            // and if it's successful don't invoke the
+	                            // error after that.
+	                            this.privSuccessCallback = undefined;
+	                            this.privErrorCallback = undefined;
 	                        }
-	                        // Only invoke the call back once.
-	                        // and if it's successful don't invoke the
-	                        // error after that.
-	                        this.privSuccessCallback = undefined;
-	                        this.privErrorCallback = undefined;
 	                    }
 	                }
 	                processed = true;
 	            }
 	        };
-	        const handleTranslationHypothesis = (hypothesis, resultProperties) => {
-	            const result = this.fireEventForResult(hypothesis, resultProperties);
-	            this.privRequestSession.onHypothesis(this.privRequestSession.currentTurnAudioOffset + result.offset);
+	        const handleTranslationHypothesis = (hypothesis) => {
+	            resultProps.setProperty(Exports_js_2.PropertyId.SpeechServiceResponse_JsonResult, hypothesis.asJson());
+	            const result = this.fireEventForResult(hypothesis, resultProps);
+	            this.privRequestSession.onHypothesis(result.offset);
 	            if (!!this.privTranslationRecognizer.recognizing) {
 	                try {
 	                    this.privTranslationRecognizer.recognizing(this.privTranslationRecognizer, result);
@@ -34645,22 +34971,22 @@ function requireTranslationServiceRecognizer () {
 	        }
 	        switch (connectionMessage.path.toLowerCase()) {
 	            case "translation.hypothesis":
-	                handleTranslationHypothesis(Exports_js_3.TranslationHypothesis.fromJSON(connectionMessage.textBody), resultProps);
+	                handleTranslationHypothesis(Exports_js_3.TranslationHypothesis.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset));
 	                break;
 	            case "translation.response":
 	                const phrase = JSON.parse(connectionMessage.textBody);
 	                if (!!phrase.SpeechPhrase) {
-	                    await handleTranslationPhrase(Exports_js_3.TranslationPhrase.fromTranslationResponse(phrase));
+	                    await handleTranslationPhrase(Exports_js_3.TranslationPhrase.fromTranslationResponse(phrase, this.privRequestSession.currentTurnAudioOffset));
 	                }
 	                else {
 	                    const hypothesis = JSON.parse(connectionMessage.textBody);
 	                    if (!!hypothesis.SpeechHypothesis) {
-	                        handleTranslationHypothesis(Exports_js_3.TranslationHypothesis.fromTranslationResponse(hypothesis), resultProps);
+	                        handleTranslationHypothesis(Exports_js_3.TranslationHypothesis.fromTranslationResponse(hypothesis, this.privRequestSession.currentTurnAudioOffset));
 	                    }
 	                }
 	                break;
 	            case "translation.phrase":
-	                await handleTranslationPhrase(Exports_js_3.TranslationPhrase.fromJSON(connectionMessage.textBody));
+	                await handleTranslationPhrase(Exports_js_3.TranslationPhrase.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset));
 	                break;
 	            case "translation.synthesis":
 	                this.sendSynthesisAudio(connectionMessage.binaryBody, this.privRequestSession.sessionId);
@@ -34734,9 +35060,9 @@ function requireTranslationServiceRecognizer () {
 	            catch { }
 	        }
 	    }
-	    handleRecognizingCallback(result, duration, sessionId) {
+	    handleRecognizingCallback(result, offset, sessionId) {
 	        try {
-	            const ev = new Exports_js_2.TranslationRecognitionEventArgs(Exports_js_2.TranslationRecognitionResult.fromSpeechRecognitionResult(result), duration, sessionId);
+	            const ev = new Exports_js_2.TranslationRecognitionEventArgs(Exports_js_2.TranslationRecognitionResult.fromSpeechRecognitionResult(result), offset, sessionId);
 	            this.privTranslationRecognizer.recognizing(this.privTranslationRecognizer, ev);
 	            /* eslint-disable no-empty */
 	        }
@@ -34778,9 +35104,8 @@ function requireTranslationServiceRecognizer () {
 	            resultReason = Exports_js_2.ResultReason.TranslatingSpeech;
 	        }
 	        const language = serviceResult.Language;
-	        const offset = serviceResult.Offset + this.privRequestSession.currentTurnAudioOffset;
-	        const result = new Exports_js_2.TranslationRecognitionResult(translations, this.privRequestSession.requestId, resultReason, serviceResult.Text, serviceResult.Duration, offset, language, confidence, serviceResult.Translation.FailureReason, JSON.stringify(serviceResult), properties);
-	        const ev = new Exports_js_2.TranslationRecognitionEventArgs(result, offset, this.privRequestSession.sessionId);
+	        const result = new Exports_js_2.TranslationRecognitionResult(translations, this.privRequestSession.requestId, resultReason, serviceResult.Text, serviceResult.Duration, serviceResult.Offset, language, confidence, serviceResult.Translation.FailureReason, serviceResult.asJson(), properties);
+	        const ev = new Exports_js_2.TranslationRecognitionEventArgs(result, serviceResult.Offset, this.privRequestSession.sessionId);
 	        return ev;
 	    }
 	    sendSynthesisAudio(audio, sessionId) {
@@ -34812,11 +35137,12 @@ var SpeechDetected$1 = {};
 Object.defineProperty(SpeechDetected$1, "__esModule", { value: true });
 SpeechDetected$1.SpeechDetected = void 0;
 class SpeechDetected {
-    constructor(json) {
+    constructor(json, baseOffset) {
         this.privSpeechStartDetected = JSON.parse(json);
+        this.privSpeechStartDetected.Offset += baseOffset;
     }
-    static fromJSON(json) {
-        return new SpeechDetected(json);
+    static fromJSON(json, baseOffset) {
+        return new SpeechDetected(json, baseOffset);
     }
     get Offset() {
         return this.privSpeechStartDetected.Offset;
@@ -34831,11 +35157,18 @@ var SpeechHypothesis$1 = {};
 Object.defineProperty(SpeechHypothesis$1, "__esModule", { value: true });
 SpeechHypothesis$1.SpeechHypothesis = void 0;
 class SpeechHypothesis {
-    constructor(json) {
+    constructor(json, baseOffset) {
         this.privSpeechHypothesis = JSON.parse(json);
+        this.updateOffset(baseOffset);
     }
-    static fromJSON(json) {
-        return new SpeechHypothesis(json);
+    static fromJSON(json, baseOffset) {
+        return new SpeechHypothesis(json, baseOffset);
+    }
+    updateOffset(baseOffset) {
+        this.privSpeechHypothesis.Offset += baseOffset;
+    }
+    asJson() {
+        return JSON.stringify(this.privSpeechHypothesis);
     }
     get Text() {
         return this.privSpeechHypothesis.Text;
@@ -34865,11 +35198,12 @@ var SpeechKeyword$1 = {};
 Object.defineProperty(SpeechKeyword$1, "__esModule", { value: true });
 SpeechKeyword$1.SpeechKeyword = void 0;
 class SpeechKeyword {
-    constructor(json) {
+    constructor(json, baseOffset) {
         this.privSpeechKeyword = JSON.parse(json);
+        this.privSpeechKeyword.Offset += baseOffset;
     }
-    static fromJSON(json) {
-        return new SpeechKeyword(json);
+    static fromJSON(json, baseOffset) {
+        return new SpeechKeyword(json, baseOffset);
     }
     get Status() {
         return this.privSpeechKeyword.Status;
@@ -34882,6 +35216,9 @@ class SpeechKeyword {
     }
     get Duration() {
         return this.privSpeechKeyword.Duration;
+    }
+    asJson() {
+        return JSON.stringify(this.privSpeechKeyword);
     }
 }
 SpeechKeyword$1.SpeechKeyword = SpeechKeyword;
@@ -34908,17 +35245,16 @@ function requireSpeechServiceRecognizer () {
 	    async processTypeSpecificMessages(connectionMessage) {
 	        let result;
 	        const resultProps = new Exports_js_1.PropertyCollection();
-	        resultProps.setProperty(Exports_js_1.PropertyId.SpeechServiceResponse_JsonResult, connectionMessage.textBody);
 	        let processed = false;
 	        switch (connectionMessage.path.toLowerCase()) {
 	            case "speech.hypothesis":
 	            case "speech.fragment":
-	                const hypothesis = Exports_js_2.SpeechHypothesis.fromJSON(connectionMessage.textBody);
-	                const offset = hypothesis.Offset + this.privRequestSession.currentTurnAudioOffset;
-	                result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, Exports_js_1.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, undefined, // Speaker Id
-	                undefined, connectionMessage.textBody, resultProps);
-	                this.privRequestSession.onHypothesis(offset);
-	                const ev = new Exports_js_1.SpeechRecognitionEventArgs(result, hypothesis.Duration, this.privRequestSession.sessionId);
+	                const hypothesis = Exports_js_2.SpeechHypothesis.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                resultProps.setProperty(Exports_js_1.PropertyId.SpeechServiceResponse_JsonResult, hypothesis.asJson());
+	                result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, Exports_js_1.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, hypothesis.Offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, undefined, // Speaker Id
+	                undefined, hypothesis.asJson(), resultProps);
+	                this.privRequestSession.onHypothesis(hypothesis.Offset);
+	                const ev = new Exports_js_1.SpeechRecognitionEventArgs(result, hypothesis.Offset, this.privRequestSession.sessionId);
 	                if (!!this.privSpeechRecognizer.recognizing) {
 	                    try {
 	                        this.privSpeechRecognizer.recognizing(this.privSpeechRecognizer, ev);
@@ -34932,37 +35268,39 @@ function requireSpeechServiceRecognizer () {
 	                processed = true;
 	                break;
 	            case "speech.phrase":
-	                const simple = Exports_js_2.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody);
+	                const simple = Exports_js_2.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                resultProps.setProperty(Exports_js_1.PropertyId.SpeechServiceResponse_JsonResult, simple.asJson());
 	                const resultReason = Exports_js_2.EnumTranslation.implTranslateRecognitionResult(simple.RecognitionStatus, this.privExpectContentAssessmentResponse);
-	                this.privRequestSession.onPhraseRecognized(this.privRequestSession.currentTurnAudioOffset + simple.Offset + simple.Duration);
+	                this.privRequestSession.onPhraseRecognized(simple.Offset + simple.Duration);
 	                if (Exports_js_1.ResultReason.Canceled === resultReason) {
 	                    const cancelReason = Exports_js_2.EnumTranslation.implTranslateCancelResult(simple.RecognitionStatus);
 	                    const cancellationErrorCode = Exports_js_2.EnumTranslation.implTranslateCancelErrorCode(simple.RecognitionStatus);
 	                    await this.cancelRecognitionLocal(cancelReason, cancellationErrorCode, Exports_js_2.EnumTranslation.implTranslateErrorDetails(cancellationErrorCode));
 	                }
 	                else {
-	                    if (!(this.privRequestSession.isSpeechEnded && resultReason === Exports_js_1.ResultReason.NoMatch && simple.RecognitionStatus !== Exports_js_2.RecognitionStatus.InitialSilenceTimeout)) {
-	                        if (this.privRecognizerConfig.parameters.getProperty(Exports_js_2.OutputFormatPropertyName) === Exports_js_1.OutputFormat[Exports_js_1.OutputFormat.Simple]) {
-	                            result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, simple.DisplayText, simple.Duration, simple.Offset + this.privRequestSession.currentTurnAudioOffset, simple.Language, simple.LanguageDetectionConfidence, undefined, // Speaker Id
-	                            undefined, connectionMessage.textBody, resultProps);
+	                    // Like the native SDK's, don't event / return an EndOfDictation message.
+	                    if (simple.RecognitionStatus === Exports_js_2.RecognitionStatus.EndOfDictation) {
+	                        break;
+	                    }
+	                    if (this.privRecognizerConfig.parameters.getProperty(Exports_js_2.OutputFormatPropertyName) === Exports_js_1.OutputFormat[Exports_js_1.OutputFormat.Simple]) {
+	                        result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, simple.DisplayText, simple.Duration, simple.Offset, simple.Language, simple.LanguageDetectionConfidence, undefined, // Speaker Id
+	                        undefined, simple.asJson(), resultProps);
+	                    }
+	                    else {
+	                        const detailed = Exports_js_2.DetailedSpeechPhrase.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                        resultProps.setProperty(Exports_js_1.PropertyId.SpeechServiceResponse_JsonResult, detailed.asJson());
+	                        result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, detailed.RecognitionStatus === Exports_js_2.RecognitionStatus.Success ? detailed.NBest[0].Display : "", detailed.Duration, detailed.Offset, detailed.Language, detailed.LanguageDetectionConfidence, undefined, // Speaker Id
+	                        undefined, detailed.asJson(), resultProps);
+	                    }
+	                    const event = new Exports_js_1.SpeechRecognitionEventArgs(result, result.offset, this.privRequestSession.sessionId);
+	                    if (!!this.privSpeechRecognizer.recognized) {
+	                        try {
+	                            this.privSpeechRecognizer.recognized(this.privSpeechRecognizer, event);
+	                            /* eslint-disable no-empty */
 	                        }
-	                        else {
-	                            const detailed = Exports_js_2.DetailedSpeechPhrase.fromJSON(connectionMessage.textBody);
-	                            const totalOffset = detailed.Offset + this.privRequestSession.currentTurnAudioOffset;
-	                            const offsetCorrectedJson = detailed.getJsonWithCorrectedOffsets(totalOffset);
-	                            result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, detailed.RecognitionStatus === Exports_js_2.RecognitionStatus.Success ? detailed.NBest[0].Display : undefined, detailed.Duration, totalOffset, detailed.Language, detailed.LanguageDetectionConfidence, undefined, // Speaker Id
-	                            undefined, offsetCorrectedJson, resultProps);
-	                        }
-	                        const event = new Exports_js_1.SpeechRecognitionEventArgs(result, result.offset, this.privRequestSession.sessionId);
-	                        if (!!this.privSpeechRecognizer.recognized) {
-	                            try {
-	                                this.privSpeechRecognizer.recognized(this.privSpeechRecognizer, event);
-	                                /* eslint-disable no-empty */
-	                            }
-	                            catch (error) {
-	                                // Not going to let errors in the event handler
-	                                // trip things up.
-	                            }
+	                        catch (error) {
+	                            // Not going to let errors in the event handler
+	                            // trip things up.
 	                        }
 	                    }
 	                    if (!!this.privSuccessCallback) {
@@ -35063,10 +35401,9 @@ function requireConversationTranscriptionServiceRecognizer () {
 	        switch (connectionMessage.path.toLowerCase()) {
 	            case "speech.hypothesis":
 	            case "speech.fragment":
-	                const hypothesis = Exports_js_2.SpeechHypothesis.fromJSON(connectionMessage.textBody);
-	                const offset = hypothesis.Offset + this.privRequestSession.currentTurnAudioOffset;
-	                result = new Exports_js_1.ConversationTranscriptionResult(this.privRequestSession.requestId, Exports_js_1.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, hypothesis.SpeakerId, undefined, connectionMessage.textBody, resultProps);
-	                this.privRequestSession.onHypothesis(offset);
+	                const hypothesis = Exports_js_2.SpeechHypothesis.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                result = new Exports_js_1.ConversationTranscriptionResult(this.privRequestSession.requestId, Exports_js_1.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, hypothesis.Offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, hypothesis.SpeakerId, undefined, hypothesis.asJson(), resultProps);
+	                this.privRequestSession.onHypothesis(hypothesis.Offset);
 	                const ev = new Exports_js_1.ConversationTranscriptionEventArgs(result, hypothesis.Duration, this.privRequestSession.sessionId);
 	                if (!!this.privConversationTranscriber.transcribing) {
 	                    try {
@@ -35081,9 +35418,9 @@ function requireConversationTranscriptionServiceRecognizer () {
 	                processed = true;
 	                break;
 	            case "speech.phrase":
-	                const simple = Exports_js_2.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody);
+	                const simple = Exports_js_2.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
 	                const resultReason = Exports_js_2.EnumTranslation.implTranslateRecognitionResult(simple.RecognitionStatus);
-	                this.privRequestSession.onPhraseRecognized(this.privRequestSession.currentTurnAudioOffset + simple.Offset + simple.Duration);
+	                this.privRequestSession.onPhraseRecognized(simple.Offset + simple.Duration);
 	                if (Exports_js_1.ResultReason.Canceled === resultReason) {
 	                    const cancelReason = Exports_js_2.EnumTranslation.implTranslateCancelResult(simple.RecognitionStatus);
 	                    const cancellationErrorCode = Exports_js_2.EnumTranslation.implTranslateCancelErrorCode(simple.RecognitionStatus);
@@ -35092,13 +35429,11 @@ function requireConversationTranscriptionServiceRecognizer () {
 	                else {
 	                    if (!(this.privRequestSession.isSpeechEnded && resultReason === Exports_js_1.ResultReason.NoMatch && simple.RecognitionStatus !== Exports_js_2.RecognitionStatus.InitialSilenceTimeout)) {
 	                        if (this.privRecognizerConfig.parameters.getProperty(Exports_js_2.OutputFormatPropertyName) === Exports_js_1.OutputFormat[Exports_js_1.OutputFormat.Simple]) {
-	                            result = new Exports_js_1.ConversationTranscriptionResult(this.privRequestSession.requestId, resultReason, simple.DisplayText, simple.Duration, simple.Offset + this.privRequestSession.currentTurnAudioOffset, simple.Language, simple.LanguageDetectionConfidence, simple.SpeakerId, undefined, connectionMessage.textBody, resultProps);
+	                            result = new Exports_js_1.ConversationTranscriptionResult(this.privRequestSession.requestId, resultReason, simple.DisplayText, simple.Duration, simple.Offset, simple.Language, simple.LanguageDetectionConfidence, simple.SpeakerId, undefined, simple.asJson(), resultProps);
 	                        }
 	                        else {
-	                            const detailed = Exports_js_2.DetailedSpeechPhrase.fromJSON(connectionMessage.textBody);
-	                            const totalOffset = detailed.Offset + this.privRequestSession.currentTurnAudioOffset;
-	                            const offsetCorrectedJson = detailed.getJsonWithCorrectedOffsets(totalOffset);
-	                            result = new Exports_js_1.ConversationTranscriptionResult(this.privRequestSession.requestId, resultReason, detailed.RecognitionStatus === Exports_js_2.RecognitionStatus.Success ? detailed.NBest[0].Display : undefined, detailed.Duration, totalOffset, detailed.Language, detailed.LanguageDetectionConfidence, simple.SpeakerId, undefined, offsetCorrectedJson, resultProps);
+	                            const detailed = Exports_js_2.DetailedSpeechPhrase.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                            result = new Exports_js_1.ConversationTranscriptionResult(this.privRequestSession.requestId, resultReason, detailed.RecognitionStatus === Exports_js_2.RecognitionStatus.Success ? detailed.NBest[0].Display : undefined, detailed.Duration, detailed.Offset, detailed.Language, detailed.LanguageDetectionConfidence, simple.SpeakerId, undefined, detailed.asJson(), resultProps);
 	                        }
 	                        const event = new Exports_js_1.ConversationTranscriptionEventArgs(result, result.offset, this.privRequestSession.sessionId);
 	                        if (!!this.privConversationTranscriber.transcribed) {
@@ -35311,39 +35646,38 @@ function requireDetailedSpeechPhrase () {
 	DetailedSpeechPhrase.DetailedSpeechPhrase = void 0;
 	const Exports_js_1 = requireExports();
 	let DetailedSpeechPhrase$1 = class DetailedSpeechPhrase {
-	    constructor(json) {
+	    constructor(json, baseOffset) {
 	        this.privDetailedSpeechPhrase = JSON.parse(json);
-	        this.privDetailedSpeechPhrase.RecognitionStatus = Exports_js_1.RecognitionStatus[this.privDetailedSpeechPhrase.RecognitionStatus];
+	        this.privDetailedSpeechPhrase.RecognitionStatus = this.mapRecognitionStatus(this.privDetailedSpeechPhrase.RecognitionStatus);
+	        this.updateOffsets(baseOffset);
 	    }
-	    static fromJSON(json) {
-	        return new DetailedSpeechPhrase(json);
+	    static fromJSON(json, baseOffset) {
+	        return new DetailedSpeechPhrase(json, baseOffset);
 	    }
-	    getJsonWithCorrectedOffsets(baseOffset) {
+	    updateOffsets(baseOffset) {
+	        this.privDetailedSpeechPhrase.Offset += baseOffset;
 	        if (!!this.privDetailedSpeechPhrase.NBest) {
-	            let firstWordOffset;
 	            for (const phrase of this.privDetailedSpeechPhrase.NBest) {
-	                if (!!phrase.Words && !!phrase.Words[0]) {
-	                    firstWordOffset = phrase.Words[0].Offset;
-	                    break;
-	                }
-	            }
-	            if (!!firstWordOffset && firstWordOffset < baseOffset) {
-	                const offset = baseOffset - firstWordOffset;
-	                for (const details of this.privDetailedSpeechPhrase.NBest) {
-	                    if (!!details.Words) {
-	                        for (const word of details.Words) {
-	                            word.Offset += offset;
-	                        }
+	                if (!!phrase.Words) {
+	                    for (const word of phrase.Words) {
+	                        word.Offset += baseOffset;
 	                    }
-	                    if (!!details.DisplayWords) {
-	                        for (const word of details.DisplayWords) {
-	                            word.Offset += offset;
-	                        }
+	                }
+	                if (!!phrase.DisplayWords) {
+	                    for (const word of phrase.DisplayWords) {
+	                        word.Offset += baseOffset;
 	                    }
 	                }
 	            }
 	        }
-	        return JSON.stringify(this.privDetailedSpeechPhrase);
+	    }
+	    asJson() {
+	        const jsonObj = { ...this.privDetailedSpeechPhrase };
+	        // Convert the enum value to its string representation for serialization purposes.
+	        return JSON.stringify({
+	            ...jsonObj,
+	            RecognitionStatus: Exports_js_1.RecognitionStatus[jsonObj.RecognitionStatus]
+	        });
 	    }
 	    get RecognitionStatus() {
 	        return this.privDetailedSpeechPhrase.RecognitionStatus;
@@ -35372,6 +35706,14 @@ function requireDetailedSpeechPhrase () {
 	    get SpeakerId() {
 	        return this.privDetailedSpeechPhrase.SpeakerId;
 	    }
+	    mapRecognitionStatus(status) {
+	        if (typeof status === "string") {
+	            return Exports_js_1.RecognitionStatus[status];
+	        }
+	        else if (typeof status === "number") {
+	            return status;
+	        }
+	    }
 	};
 	DetailedSpeechPhrase.DetailedSpeechPhrase = DetailedSpeechPhrase$1;
 
@@ -35392,12 +35734,24 @@ function requireSimpleSpeechPhrase () {
 	SimpleSpeechPhrase.SimpleSpeechPhrase = void 0;
 	const Exports_js_1 = requireExports();
 	let SimpleSpeechPhrase$1 = class SimpleSpeechPhrase {
-	    constructor(json) {
+	    constructor(json, baseOffset = 0) {
 	        this.privSimpleSpeechPhrase = JSON.parse(json);
-	        this.privSimpleSpeechPhrase.RecognitionStatus = Exports_js_1.RecognitionStatus[this.privSimpleSpeechPhrase.RecognitionStatus];
+	        this.privSimpleSpeechPhrase.RecognitionStatus = this.mapRecognitionStatus(this.privSimpleSpeechPhrase.RecognitionStatus); // RecognitionStatus[this.privSimpleSpeechPhrase.RecognitionStatus as unknown as keyof typeof RecognitionStatus];
+	        this.updateOffset(baseOffset);
 	    }
-	    static fromJSON(json) {
-	        return new SimpleSpeechPhrase(json);
+	    static fromJSON(json, baseOffset) {
+	        return new SimpleSpeechPhrase(json, baseOffset);
+	    }
+	    updateOffset(baseOffset) {
+	        this.privSimpleSpeechPhrase.Offset += baseOffset;
+	    }
+	    asJson() {
+	        const jsonObj = { ...this.privSimpleSpeechPhrase };
+	        // Convert the enum value to its string representation for serialization purposes.
+	        return JSON.stringify({
+	            ...jsonObj,
+	            RecognitionStatus: Exports_js_1.RecognitionStatus[jsonObj.RecognitionStatus]
+	        });
 	    }
 	    get RecognitionStatus() {
 	        return this.privSimpleSpeechPhrase.RecognitionStatus;
@@ -35419,6 +35773,14 @@ function requireSimpleSpeechPhrase () {
 	    }
 	    get SpeakerId() {
 	        return this.privSimpleSpeechPhrase.SpeakerId;
+	    }
+	    mapRecognitionStatus(status) {
+	        if (typeof status === "string") {
+	            return Exports_js_1.RecognitionStatus[status];
+	        }
+	        else if (typeof status === "number") {
+	            return status;
+	        }
 	    }
 	};
 	SimpleSpeechPhrase.SimpleSpeechPhrase = SimpleSpeechPhrase$1;
@@ -35487,10 +35849,10 @@ function requireIntentServiceRecognizer () {
 	        }
 	        switch (connectionMessage.path.toLowerCase()) {
 	            case "speech.hypothesis":
-	                const speechHypothesis = Exports_js_3.SpeechHypothesis.fromJSON(connectionMessage.textBody);
-	                result = new Exports_js_2.IntentRecognitionResult(undefined, this.privRequestSession.requestId, Exports_js_2.ResultReason.RecognizingIntent, speechHypothesis.Text, speechHypothesis.Duration, speechHypothesis.Offset + this.privRequestSession.currentTurnAudioOffset, speechHypothesis.Language, speechHypothesis.LanguageDetectionConfidence, undefined, connectionMessage.textBody, resultProps);
+	                const speechHypothesis = Exports_js_3.SpeechHypothesis.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                result = new Exports_js_2.IntentRecognitionResult(undefined, this.privRequestSession.requestId, Exports_js_2.ResultReason.RecognizingIntent, speechHypothesis.Text, speechHypothesis.Duration, speechHypothesis.Offset, speechHypothesis.Language, speechHypothesis.LanguageDetectionConfidence, undefined, speechHypothesis.asJson(), resultProps);
 	                this.privRequestSession.onHypothesis(result.offset);
-	                ev = new Exports_js_2.IntentRecognitionEventArgs(result, speechHypothesis.Offset + this.privRequestSession.currentTurnAudioOffset, this.privRequestSession.sessionId);
+	                ev = new Exports_js_2.IntentRecognitionEventArgs(result, speechHypothesis.Offset, this.privRequestSession.sessionId);
 	                if (!!this.privIntentRecognizer.recognizing) {
 	                    try {
 	                        this.privIntentRecognizer.recognizing(this.privIntentRecognizer, ev);
@@ -35504,8 +35866,8 @@ function requireIntentServiceRecognizer () {
 	                processed = true;
 	                break;
 	            case "speech.phrase":
-	                const simple = Exports_js_3.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody);
-	                result = new Exports_js_2.IntentRecognitionResult(undefined, this.privRequestSession.requestId, Exports_js_3.EnumTranslation.implTranslateRecognitionResult(simple.RecognitionStatus), simple.DisplayText, simple.Duration, simple.Offset + this.privRequestSession.currentTurnAudioOffset, simple.Language, simple.LanguageDetectionConfidence, undefined, connectionMessage.textBody, resultProps);
+	                const simple = Exports_js_3.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                result = new Exports_js_2.IntentRecognitionResult(undefined, this.privRequestSession.requestId, Exports_js_3.EnumTranslation.implTranslateRecognitionResult(simple.RecognitionStatus), simple.DisplayText, simple.Duration, simple.Offset, simple.Language, simple.LanguageDetectionConfidence, undefined, simple.asJson(), resultProps);
 	                ev = new Exports_js_2.IntentRecognitionEventArgs(result, result.offset, this.privRequestSession.sessionId);
 	                const sendEvent = () => {
 	                    if (!!this.privIntentRecognizer.recognized) {
@@ -36493,8 +36855,8 @@ function requireDialogServiceAdapter () {
 	        let processed;
 	        switch (connectionMessage.path.toLowerCase()) {
 	            case "speech.phrase":
-	                const speechPhrase = Exports_js_4.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody);
-	                this.privRequestSession.onPhraseRecognized(this.privRequestSession.currentTurnAudioOffset + speechPhrase.Offset + speechPhrase.Duration);
+	                const speechPhrase = Exports_js_4.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                this.privRequestSession.onPhraseRecognized(speechPhrase.Offset + speechPhrase.Duration);
 	                if (speechPhrase.RecognitionStatus !== Exports_js_4.RecognitionStatus.TooManyRequests && speechPhrase.RecognitionStatus !== Exports_js_4.RecognitionStatus.Error) {
 	                    const args = this.fireEventForResult(speechPhrase, resultProps);
 	                    this.privLastResult = args.result;
@@ -36512,11 +36874,10 @@ function requireDialogServiceAdapter () {
 	                processed = true;
 	                break;
 	            case "speech.hypothesis":
-	                const hypothesis = Exports_js_4.SpeechHypothesis.fromJSON(connectionMessage.textBody);
-	                const offset = hypothesis.Offset + this.privRequestSession.currentTurnAudioOffset;
-	                result = new Exports_js_3.SpeechRecognitionResult(this.privRequestSession.requestId, Exports_js_3.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, undefined, undefined, connectionMessage.textBody, resultProps);
-	                this.privRequestSession.onHypothesis(offset);
-	                const ev = new Exports_js_3.SpeechRecognitionEventArgs(result, hypothesis.Duration, this.privRequestSession.sessionId);
+	                const hypothesis = Exports_js_4.SpeechHypothesis.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                result = new Exports_js_3.SpeechRecognitionResult(this.privRequestSession.requestId, Exports_js_3.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, hypothesis.Offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, undefined, undefined, hypothesis.asJson(), resultProps);
+	                this.privRequestSession.onHypothesis(hypothesis.Offset);
+	                const ev = new Exports_js_3.SpeechRecognitionEventArgs(result, hypothesis.Offset, this.privRequestSession.sessionId);
 	                if (!!this.privDialogServiceConnector.recognizing) {
 	                    try {
 	                        this.privDialogServiceConnector.recognizing(this.privDialogServiceConnector, ev);
@@ -36530,8 +36891,8 @@ function requireDialogServiceAdapter () {
 	                processed = true;
 	                break;
 	            case "speech.keyword":
-	                const keyword = Exports_js_4.SpeechKeyword.fromJSON(connectionMessage.textBody);
-	                result = new Exports_js_3.SpeechRecognitionResult(this.privRequestSession.requestId, keyword.Status === "Accepted" ? Exports_js_3.ResultReason.RecognizedKeyword : Exports_js_3.ResultReason.NoMatch, keyword.Text, keyword.Duration, keyword.Offset, undefined, undefined, undefined, undefined, connectionMessage.textBody, resultProps);
+	                const keyword = Exports_js_4.SpeechKeyword.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                result = new Exports_js_3.SpeechRecognitionResult(this.privRequestSession.requestId, keyword.Status === "Accepted" ? Exports_js_3.ResultReason.RecognizedKeyword : Exports_js_3.ResultReason.NoMatch, keyword.Text, keyword.Duration, keyword.Offset, undefined, undefined, undefined, undefined, keyword.asJson(), resultProps);
 	                if (keyword.Status !== "Accepted") {
 	                    this.privLastResult = result;
 	                }
@@ -36685,7 +37046,7 @@ function requireDialogServiceAdapter () {
 	                        }
 	                        break;
 	                    case "speech.startdetected":
-	                        const speechStartDetected = Exports_js_4.SpeechDetected.fromJSON(connectionMessage.textBody);
+	                        const speechStartDetected = Exports_js_4.SpeechDetected.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
 	                        const speechStartEventArgs = new Exports_js_3.RecognitionEventArgs(speechStartDetected.Offset, this.privRequestSession.sessionId);
 	                        if (!!this.privRecognizer.speechStartDetected) {
 	                            this.privRecognizer.speechStartDetected(this.privRecognizer, speechStartEventArgs);
@@ -36700,9 +37061,9 @@ function requireDialogServiceAdapter () {
 	                            // If the request was empty, the JSON returned is empty.
 	                            json = "{ Offset: 0 }";
 	                        }
-	                        const speechStopDetected = Exports_js_4.SpeechDetected.fromJSON(json);
-	                        this.privRequestSession.onServiceRecognized(speechStopDetected.Offset + this.privRequestSession.currentTurnAudioOffset);
-	                        const speechStopEventArgs = new Exports_js_3.RecognitionEventArgs(speechStopDetected.Offset + this.privRequestSession.currentTurnAudioOffset, this.privRequestSession.sessionId);
+	                        const speechStopDetected = Exports_js_4.SpeechDetected.fromJSON(json, this.privRequestSession.currentTurnAudioOffset);
+	                        this.privRequestSession.onServiceRecognized(speechStopDetected.Offset);
+	                        const speechStopEventArgs = new Exports_js_3.RecognitionEventArgs(speechStopDetected.Offset, this.privRequestSession.sessionId);
 	                        if (!!this.privRecognizer.speechEndDetected) {
 	                            this.privRecognizer.speechEndDetected(this.privRecognizer, speechStopEventArgs);
 	                        }
@@ -36830,9 +37191,8 @@ function requireDialogServiceAdapter () {
 	    }
 	    fireEventForResult(serviceResult, properties) {
 	        const resultReason = Exports_js_4.EnumTranslation.implTranslateRecognitionResult(serviceResult.RecognitionStatus);
-	        const offset = serviceResult.Offset + this.privRequestSession.currentTurnAudioOffset;
-	        const result = new Exports_js_3.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, serviceResult.DisplayText, serviceResult.Duration, offset, serviceResult.Language, serviceResult.LanguageDetectionConfidence, undefined, undefined, JSON.stringify(serviceResult), properties);
-	        const ev = new Exports_js_3.SpeechRecognitionEventArgs(result, offset, this.privRequestSession.sessionId);
+	        const result = new Exports_js_3.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, serviceResult.DisplayText, serviceResult.Duration, serviceResult.Offset, serviceResult.Language, serviceResult.LanguageDetectionConfidence, undefined, undefined, serviceResult.asJson(), properties);
+	        const ev = new Exports_js_3.SpeechRecognitionEventArgs(result, serviceResult.Offset, this.privRequestSession.sessionId);
 	        return ev;
 	    }
 	    handleResponseMessage(responseMessage) {
@@ -39474,6 +39834,7 @@ function requireAvatarSynthesisAdapter () {
 	                character: this.privAvatarConfig.character,
 	                customized: this.privAvatarConfig.customized,
 	                style: this.privAvatarConfig.style,
+	                useBuiltInVoice: this.privAvatarConfig.useBuiltInVoice,
 	            }
 	        };
 	    }
@@ -40309,7 +40670,7 @@ var SpeechServiceConfig = {};
 	class System {
 	    constructor() {
 	        // Note: below will be patched for official builds.
-	        const SPEECHSDK_CLIENTSDK_VERSION = "1.41.0";
+	        const SPEECHSDK_CLIENTSDK_VERSION = "1.43.0";
 	        this.name = "SpeechSDK";
 	        this.version = SPEECHSDK_CLIENTSDK_VERSION;
 	        this.build = "JavaScript";
@@ -40473,51 +40834,22 @@ function requireExports () {
 	
 } (microsoft_cognitiveservices_speech_sdk));
 
-// components/speech.js
-
+// speech.js
 
 /**
- * @param {string} message
- * @param {string} voiceURI
- * @param {number} pitch
- * @param {number} rate
- * @param {number} volume
+ * Speech component using Microsoft Cognitive Services Speech SDK.
  */
-async function speak(message, voiceURI, pitch, rate, volume) {
-  if (!message) return;
-  const voices = await getVoices();
-  const voice = voiceURI && voices.find((voice) => voice.voiceURI === voiceURI);
-  const utterance = new SpeechSynthesisUtterance(message);
-  
-  if (voice) {
-    utterance.voice = voice;
-    utterance.lang = voice.lang;
-  }
-  
-  utterance.pitch = pitch;
-  utterance.rate = rate;
-  utterance.volume = volume;
-  
-  // Cancel any ongoing speech synthesis
-  speechSynthesis.cancel();
-  
-  // Speak the utterance
-  speechSynthesis.speak(utterance);
-}
-
 class Speech extends TreeBase {
+  // Define properties with default values
   stateName = new String$1("$Speak");
-  voiceURI = new String$1("$VoiceURI", "en-US-DavisNeural"); // Default to Davis
+  voiceURI = new String$1("$VoiceURI", "en-US-DavisNeural"); // Default to DavisNeural
   expressStyle = new String$1("$ExpressStyle", "friendly"); // Default expression style
-  pitch = new Float("$Pitch", 0); // Default pitch adjustment (percentage)
-  rate = new Float("$Rate", 1); // Default rate (percentage)
-  volume = new Float("$Volume", 1); // Default volume (percentage)
   isSpeaking = false; // Track if currently speaking
+  startTime = null; // Track synthesis start time
 
   constructor() {
     super();
     this.initSynthesizer();
-    this.handleStateUpdates = this.handleStateUpdates.bind(this);
   }
 
   /**
@@ -40529,272 +40861,130 @@ class Speech extends TreeBase {
   }
 
   /**
-   * Initializes the Speech Synthesizer with Microsoft Cognitive Services Speech SDK.
+   * Initializes the Speech Synthesizer with the Microsoft SDK.
    */
   initSynthesizer() {
-    try {
-      // Initialize speech configuration with subscription key and region
-      // Replace with your actual subscription key and region
-      this.speechConfig = microsoft_cognitiveservices_speech_sdk.SpeechConfig.fromSubscription(
-        "c7d8e36fdf414cbaae05819919fd416d", // Replace with your actual subscription key
-        "eastus"    // e.g., "eastus"
-      );
+    this.speechConfig = microsoft_cognitiveservices_speech_sdk.SpeechConfig.fromSubscription(
+      'c7d8e36fdf414cbaae05819919fd416d', // Replace with your actual subscription key
+      'eastus' // Replace with your service region
+    );
 
-      this.speechConfig.speechSynthesisOutputFormat =
-        microsoft_cognitiveservices_speech_sdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3; // High-quality MP3 format
+    this.speechConfig.speechSynthesisOutputFormat =
+      microsoft_cognitiveservices_speech_sdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3;
 
-      this.audioConfig = microsoft_cognitiveservices_speech_sdk.AudioConfig.fromDefaultSpeakerOutput();
-      this.synthesizer = new microsoft_cognitiveservices_speech_sdk.SpeechSynthesizer(
-        this.speechConfig,
-        this.audioConfig
-      );
+    this.audioConfig = microsoft_cognitiveservices_speech_sdk.AudioConfig.fromDefaultSpeakerOutput();
+    this.synthesizer = new microsoft_cognitiveservices_speech_sdk.SpeechSynthesizer(
+      this.speechConfig,
+      this.audioConfig
+    );
 
-      // Event listeners for synthesis lifecycle
-      this.synthesizer.synthesisStarted = (s, e) =>
-        this.logWithTimestamp("Synthesis started");
-      this.synthesizer.synthesisCompleted = (s, e) => {
-        this.logWithTimestamp("Synthesis completed");
-        this.isSpeaking = false; // Reset speaking flag
-      };
-      this.synthesizer.synthesisCanceled = (s, e) => {
-        this.logWithTimestamp(
-          `Synthesis canceled: ${e.reason} - ${e.errorDetails}`
-        );
-        this.isSpeaking = false; // Reset speaking flag
-      };
-      this.synthesizer.synthesisFailed = (s, e) => {
-        this.logWithTimestamp(`Synthesis failed: ${e.errorDetails}`);
-        this.isSpeaking = false; // Reset speaking flag
-      };
+    this.synthesizer.synthesisStarted = (s, e) => {
+      this.startTime = performance.now();
+      this.logWithTimestamp("Synthesis started");
+    };
 
-      this.logWithTimestamp("Synthesizer initialized.");
-    } catch (error) {
-      this.logWithTimestamp(`Error initializing synthesizer: ${error}`);
-    }
+    this.synthesizer.synthesisCompleted = (s, e) => {
+      const endTime = performance.now();
+      const latency = endTime - this.startTime;
+      this.logWithTimestamp(`Synthesis completed in ${latency.toFixed(2)} ms`);
+      this.isSpeaking = false;
+      this.initSynthesizer();
+    };
+
+    this.synthesizer.synthesisCanceled = (s, e) => {
+      this.logWithTimestamp(`Synthesis canceled: ${e.reason}`);
+      this.isSpeaking = false;
+      this.initSynthesizer();
+    };
   }
 
   /**
-   * Constructs SSML with the specified parameters.
-   * @param {string} message - The message to synthesize.
-   * @param {string} voice - The voice URI.
-   * @param {string} style - The express-as style.
-   * @param {number} pitch - The pitch adjustment (percentage).
-   * @param {number} rate - The speaking rate (percentage).
-   * @param {number} volume - The volume level (percentage).
-   * @returns {string} - The constructed SSML string.
-   */
-  constructSSML(message, voice, style, pitch, rate, volume) {
-    return `
-      <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" 
-             xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
-        <voice name="${voice}">
-          <mstts:express-as style="${style}">
-            <prosody pitch="${pitch}%" rate="${rate}%" volume="${volume}%">
-              ${message}
-            </prosody>
-          </mstts:express-as>
-        </voice>
-      </speak>`;
-  }
-
-  /**
-   * Initiates speech synthesis of the provided message.
+   * Initiates speech synthesis for the given message.
    */
   async speak() {
     if (this.isSpeaking) {
       this.logWithTimestamp("Cancelling current speech synthesis.");
-      this.synthesizer.close(); // Close the current synthesizer to cancel
+      this.synthesizer.close();
       this.isSpeaking = false;
-      this.initSynthesizer(); // Re-initialize synthesizer after cancellation
     }
+
+    this.isSpeaking = true;
 
     const { state } = Globals;
     const message = state.get(this.stateName.value);
     const voice = state.get(this.voiceURI.value) || "en-US-DavisNeural";
     const style = state.get(this.expressStyle.value) || "friendly";
-    const pitch = state.get(this.pitch.value) || 0; // Percentage
-    const rate = state.get(this.rate.value) || 1; // Percentage
-    const volume = state.get(this.volume.value) || 1; // Percentage
 
     if (!message) {
       this.logWithTimestamp("No message to speak.");
+      this.isSpeaking = false;
       return;
     }
 
-    this.logWithTimestamp(
-      `Speaking with Voice: ${voice}, Style: ${style}, Pitch: ${pitch}%, Rate: ${rate}%, Volume: ${volume}%`
-    );
+    this.logWithTimestamp(`Using voice: ${voice}, style: ${style}, message: ${message}`);
 
-    const ssml = this.constructSSML(message, voice, style, pitch, rate, volume);
+    const ssml = `
+      <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
+        <voice name="${voice}">
+          <mstts:express-as style="${style}">
+            ${this.escapeSSML(message)}
+          </mstts:express-as>
+        </voice>
+      </speak>`;
 
     try {
-      this.isSpeaking = true;
+      this.startTime = performance.now();
       this.synthesizer.speakSsmlAsync(
         ssml,
         (result) => {
-          if (
-            result.reason === microsoft_cognitiveservices_speech_sdk.ResultReason.SynthesizingAudioCompleted
-          ) {
-            this.logWithTimestamp("Speech synthesized successfully.");
+          const endTime = performance.now();
+          const latency = endTime - this.startTime;
+          if (result.reason === microsoft_cognitiveservices_speech_sdk.ResultReason.SynthesizingAudioCompleted) {
+            this.logWithTimestamp(`Speech synthesized successfully in ${latency.toFixed(2)} ms`);
           } else if (result.reason === microsoft_cognitiveservices_speech_sdk.ResultReason.Canceled) {
-            const cancellation = microsoft_cognitiveservices_speech_sdk.SpeechSynthesisCancellationDetails.fromResult(
-              result
-            );
+            const cancellationDetails = microsoft_cognitiveservices_speech_sdk.SpeechSynthesisCancellationDetails.fromResult(result);
             this.logWithTimestamp(
-              `Speech synthesis canceled: ${cancellation.reason} - ${cancellation.errorDetails}`
+              `Speech synthesis canceled: ${cancellationDetails.reason}, ${cancellationDetails.errorDetails}`
             );
           }
           this.isSpeaking = false;
-          this.initSynthesizer(); // Re-initialize after synthesis
+          this.initSynthesizer();
         },
         (error) => {
           this.logWithTimestamp(`An error occurred: ${error}`);
           this.isSpeaking = false;
-          this.initSynthesizer(); // Re-initialize after error
+          this.initSynthesizer();
         }
       );
     } catch (error) {
       this.logWithTimestamp(`Error in speak method: ${error}`);
       this.isSpeaking = false;
-      this.initSynthesizer(); // Re-initialize after error
+      this.initSynthesizer();
     }
   }
 
-  /**
-   * Handles state updates to trigger speech synthesis.
-   */
-  handleStateUpdates() {
-    const { state } = Globals;
-    if (state.hasBeenUpdated(this.stateName.value)) {
-      this.speak();
-    }
+  escapeSSML(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  /**
-   * Lifecycle method called when the component is added to the DOM.
-   */
-  init() {
-    super.init();
-    // Subscribe to state updates
-    Globals.state.subscribe(this.handleStateUpdates);
-  }
-
-  /**
-   * Lifecycle method called when the component is removed from the DOM.
-   */
   disconnectedCallback() {
     if (this.isSpeaking) {
       this.synthesizer.close();
       this.isSpeaking = false;
-      this.logWithTimestamp("Synthesizer stopped on component disconnect.");
+      this.logWithTimestamp("Synthesizer stopped on component disconnect");
     }
-    // Unsubscribe from state updates to prevent memory leaks
-    Globals.state.unsubscribe(this.handleStateUpdates);
   }
 
-  /**
-   * Renders the component.
-   * @returns {TemplateResult} - The rendered HTML template.
-   */
   template() {
-    return html`<div />`; // Empty div as no UI is needed
+    const { state } = Globals;
+    if (state.hasBeenUpdated(this.stateName.value)) {
+      this.speak();
+    }
+    return html`<div />`;
   }
 }
 
-// Register the Speech class with the component framework
 TreeBase.register(Speech, "Speech");
-
-/**
- * Optional: Custom Voice Selection Component for Microsoft TTS
- * Note: Microsoft TTS handles voices via SSML, so fetching available voices may require backend support or a predefined list.
- */
-
-class VoiceSelect extends HTMLSelectElement {
-  constructor() {
-    super();
-    this.populateVoices = this.populateVoices.bind(this);
-  }
-
-  connectedCallback() {
-    this.populateVoices();
-    // Listen for changes and update the selected voice in the state
-    this.addEventListener("change", this.onVoiceChange);
-  }
-
-  disconnectedCallback() {
-    this.removeEventListener("change", this.onVoiceChange);
-  }
-
-  async populateVoices() {
-    try {
-      // Fetch available voices from your backend or define them statically
-      const voices = await fetchAvailableMicrosoftVoices(); // Implement this function based on your setup
-
-      // Sort voices alphabetically
-      voices.sort((a, b) => a.localeCompare(b));
-
-      const current = this.getAttribute("value") || "en-US-DavisNeural";
-      voices.forEach((voice) => {
-        const option = document.createElement("option");
-        option.value = voice;
-        option.text = voice; // You can format this better if needed
-        if (voice === current) option.selected = true;
-        this.add(option);
-      });
-    } catch (error) {
-      console.error("Error populating voices:", error);
-    }
-  }
-
-  onVoiceChange(event) {
-    const selectedVoice = event.target.value;
-    // Update the state with the selected voice
-    Globals.state.set("$VoiceURI", selectedVoice);
-  }
-}
-
-// Register the custom element
-customElements.define("select-microsoft-voice", VoiceSelect, {
-  extends: "select",
-});
-
-/**
- * Helper Function to Fetch Available Microsoft TTS Voices
- * Implement this based on your backend or configuration.
- * For example, you can fetch from a predefined list or an API endpoint.
- */
-async function fetchAvailableMicrosoftVoices() {
-  // Example static list; replace with dynamic fetching if necessary
-  return [
-    "en-US-DavisNeural",
-    "en-US-JennyNeural",
-    "en-US-GuyNeural",
-    "en-US-AriaNeural",
-    "en-US-BrandonNeural",
-    "en-US-CelineNeural",
-    // Add more voices as needed
-  ];
-}
-
-/**
- * Promise to return voices
- *
- * @return {Promise<SpeechSynthesisVoice[]>} Available voices
- */
-function getVoices() {
-  return new Promise(function (resolve) {
-    // iOS won't fire the voiceschanged event so we have to poll for them
-    function f() {
-      voices = (voices.length && voices) || speechSynthesis.getVoices();
-      if (voices.length) resolve(voices);
-      else setTimeout(f, 100);
-    }
-    f();
-  });
-}
-
-/** @type{SpeechSynthesisVoice[]} */
-let voices = [];
 
 /** @param {string} filename */
 async function playAudio(filename) {
@@ -41053,7 +41243,7 @@ async function ClearLog() {
  * Download the conversation history as a CSV file.
  */
 async function DownloadCSV() {
-  const serverUrl = "http://34.118.128.211:5678/download_csv"; // Adjust if necessary
+  const serverUrl = "http://34.136.166.29:5678/download_csv"; // Adjust if necessary
 
   try {
     const response = await fetch(serverUrl);
@@ -42045,6 +42235,10 @@ class Actions extends DesignerPanel {
             ]),
           );
           Globals.state.update(patch);
+          // Trigger the DownloadCSV function if $triggerDownloadCSV state is updated
+          if (patch['$triggerDownloadCSV'] === true || patch['$triggerDownloadCSV'] === 1) {
+            DownloadCSV();
+          }
           break;
         }
       }
@@ -42812,12 +43006,7 @@ function execFinalizer(finalizer) {
 }
 
 var config = {
-    onUnhandledError: null,
-    onStoppedNotification: null,
-    Promise: undefined,
-    useDeprecatedSynchronousErrorHandling: false,
-    useDeprecatedNextContext: false,
-};
+    Promise: undefined};
 
 var timeoutProvider = {
     setTimeout: function (handler, timeout) {
@@ -42828,8 +43017,7 @@ var timeoutProvider = {
         return setTimeout.apply(void 0, __spreadArray([handler, timeout], __read(args)));
     },
     clearTimeout: function (handle) {
-        var delegate = timeoutProvider.delegate;
-        return ((delegate === null || delegate === void 0 ? void 0 : delegate.clearTimeout) || clearTimeout)(handle);
+        return (clearTimeout)(handle);
     },
     delegate: undefined,
 };
@@ -42917,10 +43105,6 @@ var Subscriber = (function (_super) {
     };
     return Subscriber;
 }(Subscription));
-var _bind = Function.prototype.bind;
-function bind(fn, thisArg) {
-    return _bind.call(fn, thisArg);
-}
 var ConsumerObserver = (function () {
     function ConsumerObserver(partialObserver) {
         this.partialObserver = partialObserver;
@@ -42976,17 +43160,7 @@ var SafeSubscriber = (function (_super) {
             };
         }
         else {
-            var context_1;
-            if (_this && config.useDeprecatedNextContext) {
-                context_1 = Object.create(observerOrNext);
-                context_1.unsubscribe = function () { return _this.unsubscribe(); };
-                partialObserver = {
-                    next: observerOrNext.next && bind(observerOrNext.next, context_1),
-                    error: observerOrNext.error && bind(observerOrNext.error, context_1),
-                    complete: observerOrNext.complete && bind(observerOrNext.complete, context_1),
-                };
-            }
-            else {
+            {
                 partialObserver = observerOrNext;
             }
         }
@@ -43955,9 +44129,9 @@ function map(project, thisArg) {
     });
 }
 
-var isArray$1 = Array.isArray;
+var isArray = Array.isArray;
 function callOrApply(fn, args) {
-    return isArray$1(args) ? fn.apply(void 0, __spreadArray([], __read(args))) : fn(args);
+    return isArray(args) ? fn.apply(void 0, __spreadArray([], __read(args))) : fn(args);
 }
 function mapOneOrManyArgs(fn) {
     return map(function (args) { return callOrApply(fn, args); });
@@ -44131,11 +44305,6 @@ function merge$1() {
                 mergeAll(concurrent)(from(sources, scheduler));
 }
 
-var isArray = Array.isArray;
-function argsOrArgArray(args) {
-    return args.length === 1 && isArray(args[0]) ? args[0] : args;
-}
-
 function filter(predicate, thisArg) {
     return operate(function (source, subscriber) {
         var index = 0;
@@ -44253,7 +44422,7 @@ function defaultCompare(a, b) {
 }
 
 function distinctUntilKeyChanged(key, compare) {
-    return distinctUntilChanged(function (x, y) { return x[key] === y[key]; });
+    return distinctUntilChanged(function (x, y) { return (x[key] === y[key]); });
 }
 
 function groupBy(keySelector, elementOrOptions, duration, connector) {
@@ -44318,7 +44487,6 @@ function merge() {
     }
     var scheduler = popScheduler(args);
     var concurrent = popNumber(args, Infinity);
-    args = argsOrArgArray(args);
     return operate(function (source, subscriber) {
         mergeAll(concurrent)(from(__spreadArray([source], __read(args)), scheduler)).subscribe(subscriber);
     });
@@ -45297,13 +45465,19 @@ const defaultPatterns = {
   ],
 };
 
-// only run one animation at a time
+// index.js
+
+// Create a singleton instance of Speech
+new Speech();
+
+// Only run one animation at a time
 let animationNonce = 0;
 
-/** @param {Target} target
+/**
+ * @param {Target} target
  * @param {string} defaultValue
  * @param {boolean} isGroup
- * */
+ */
 function cueTarget(target, defaultValue, isGroup = false) {
   let fields = {};
   if (target instanceof HTMLButtonElement) {
@@ -45329,13 +45503,11 @@ function cueTarget(target, defaultValue, isGroup = false) {
   if (!isGroup && cue) {
     if (cue.SpeechField.value) {
       const message = fields[cue.SpeechField.value.slice(1)];
-      speak(
-        message,
-        cue.voiceURI.value,
-        cue.pitch.value,
-        cue.rate.value,
-        cue.volume.value,
-      );
+      // Trigger speech synthesis using the Speech class instance
+      // Update the global state to notify the Speech component
+      Globals.state.set("$Speak", message);
+      Globals.state.set("$VoiceURI", cue.voiceURI.value);
+      Globals.state.set("$ExpressStyle", cue.expressStyle.value || "friendly"); // Default style if not provided
     }
     if (cue.AudioField.value) {
       const file = fields[cue.AudioField.value.slice(1)] || "";
@@ -45343,6 +45515,8 @@ function cueTarget(target, defaultValue, isGroup = false) {
     }
   }
 }
+
+
 
 function clearCues() {
   for (const element of document.querySelectorAll("#UI [cue]")) {
@@ -48568,7 +48742,7 @@ function signalUpdateAvailable() {
 if (navigator.serviceWorker) {
   window.addEventListener("load", async () => {
     registration = await navigator.serviceWorker.register("service-worker.js", {
-      scope: "/OS-DPI/"
+      scope: "/cadl_osdpi/OS-DPI/"
     });
     if (registration.waiting) {
       signalUpdateAvailable();
@@ -49811,4 +49985,3 @@ window.addEventListener("resize", () => {
 });
 
 start();
-//# sourceMappingURL=index.js.map

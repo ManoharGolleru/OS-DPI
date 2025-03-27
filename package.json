@@ -3,7 +3,7 @@
   "version": "0.8.0",
   "description": "",
   "scripts": {
-    "start": "vite --port 8080 --host 0.0.0.0",
+    "start": "vite preview --port 8080 --host 127.0.0.1",
     "build": "vite build",
     "deploy": "npm run build && gh-pages -d dist",
     "publish": "./publish.sh",
@@ -22,15 +22,15 @@
     "angular-expressions": "^1.2.1",
     "browser-fs-access": "^0.35.0",
     "fflate": "^0.8.2",
+    "howler": "^2.2.3",
     "idb": "^8.0.0",
     "mergerino": "^0.4.0",
-    "microsoft-cognitiveservices-speech-sdk": "^1.41.0",
+    "microsoft-cognitiveservices-speech-sdk": "^1.43.0",
     "rxjs": "^7.8.1",
     "stacktrace-js": "^2.0.2",
     "tracky-mouse": "^1.0.0",
     "uhtml": "^4.5.11",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.19.3/xlsx-0.19.3.tgz",
-    "howler": "^2.2.3"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.19.3/xlsx-0.19.3.tgz"
   },
   "type": "module"
 }
