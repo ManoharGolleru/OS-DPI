@@ -1,4 +1,5 @@
 import "@ungap/custom-elements";
+import { io } from "socket.io-client";
 import { Messages } from "./components/errors";
 import { Data } from "./data";
 import { State } from "./state";
@@ -20,17 +21,29 @@ import { Designer } from "components/designer";
 import { workerCheckForUpdate } from "components/serviceWorker";
 import { accessed } from "./eval";
 
-/** let me wait for the page to load */
-const pageLoaded = new Promise((resolve) => {
+/** wait for the page to load */
+const pageLoaded = new Promise(resolve => {
   window.addEventListener("load", () => {
     document.body.classList.add("loaded");
     resolve(true);
   });
 });
 
-/** Load page and data then go
- */
 export async function start() {
+  // 1) Parse sessionId from URL
+  const [, , sessionId] = window.location.pathname.split("/");
+
+  // 2) Init Socket.IO
+  const socket = io("/", { query: { sessionId } });
+  Globals.socket = socket;
+
+  // 3) Handle incoming keyPress events
+  socket.on("keyPress", ({ x, y }) => {
+    // e.g. update state or highlight button:
+    // Globals.state.update({ lastKeyPress: { x, y } });
+  });
+
+  // …the rest is your existing logic unchanged…
   let editing = true;
   if (window.location.search) {
     const params = new URLSearchParams(window.location.search);
@@ -38,13 +51,16 @@ export async function start() {
     console.log({ fetch });
     if (fetch) {
       await pleaseWait(
-        db.readDesignFromURL(fetch, window.location.hash.slice(1)),
+        db.readDesignFromURL(fetch, window.location.hash.slice(1))
       );
       editing = params.get("edit") !== null;
       window.history.replaceState(
         {},
         document.title,
-        window.location.origin + window.location.pathname + "#" + db.designName,
+        window.location.origin +
+          window.location.pathname +
+          "#" +
+          db.designName
       );
     }
   }
@@ -68,13 +84,11 @@ export async function start() {
   Globals.patterns = await PatternList.load(PatternList);
   Globals.method = await MethodChooser.load(MethodChooser);
   Globals.restart = async () => {
-    // tear down any existing event handlers before restarting
     Globals.method.stop();
     start();
   };
   Globals.error = new Messages();
 
-  /** @param {() => void} f */
   function debounce(f) {
     let timeout = null;
     return () => {
@@ -83,42 +97,31 @@ export async function start() {
     };
   }
 
-  /* Designer */
-  Globals.state.define("editing", editing); // for now
-  Globals.designer = /** @type {Designer} */ (
-    Designer.fromObject({
-      className: "Designer",
-      props: { tabEdge: "top", stateName: "designerTab" },
-      children: [
-        layout,
-        {
-          className: "Content",
-          props: {},
-          children: [],
-        },
-        Globals.actions,
-        Globals.cues,
-        Globals.patterns,
-        Globals.method,
-      ],
-    })
-  );
+  Globals.state.define("editing", editing);
+  Globals.designer = Designer.fromObject({
+    className: "Designer",
+    props: { tabEdge: "top", stateName: "designerTab" },
+    children: [
+      layout,
+      { className: "Content", props: {}, children: [] },
+      Globals.actions,
+      Globals.cues,
+      Globals.patterns,
+      Globals.method,
+    ],
+  });
 
-  /* ToolBar */
   const toolbar = ToolBar.create("ToolBar", null);
   toolbar.init();
 
-  /* Monitor */
   const monitor = Monitor.create("Monitor", null);
   monitor.init();
 
   function renderUI() {
-    // report the time to draw the frame
     if (location.host.startsWith("localhost")) {
       const startTime = performance.now();
       const timer = document.getElementById("timer");
       if (timer) {
-        // I think this makes it wait until all drawing is done.
         requestAnimationFrame(() => {
           setTimeout(() => {
             timer.innerText = `${(performance.now() - startTime).toFixed(0)}ms`;
@@ -126,7 +129,6 @@ export async function start() {
         });
       }
     }
-    // the real update begins here
     const editing = Globals.state.get("editing");
     document.body.classList.toggle("designing", editing);
     safeRender("cues", Globals.cues);
@@ -139,11 +141,8 @@ export async function start() {
     }
     postRender();
     Globals.method.refresh();
-    // clear the accessed bits for the next cycle
     accessed.clear();
-    // clear the updated bits for the next cycle
     Globals.state.clearUpdated();
-
     workerCheckForUpdate();
     document.dispatchEvent(new Event("rendercomplete"));
   }
@@ -152,35 +151,25 @@ export async function start() {
   renderUI();
 }
 
-/* Watch for updates happening in other tabs */
+// existing BroadcastChannel + hashchange + resize logic…
 const channel = new BroadcastChannel("os-dpi");
-/** @param {MessageEvent} event */
-channel.onmessage = (event) => {
-  const message = /** @type {UpdateNotification} */ (event.data);
+channel.onmessage = event => {
+  const message = event.data;
   if (db.designName == message.name) {
-    if (message.action == "update") {
-      start();
-    } else if (message.action == "rename" && message.newName) {
+    if (message.action == "update") start();
+    else if (message.action == "rename" && message.newName)
       window.location.hash = message.newName;
-    } else if (message.action == "unload") {
+    else if (message.action == "unload") {
       window.close();
-      if (!window.closed) {
-        window.location.hash = "new";
-      }
+      if (!window.closed) window.location.hash = "new";
     }
   }
 };
-db.addUpdateListener((message) => {
-  channel.postMessage(message);
-});
-
-// watch for changes to the hash such as using the browser back button
+db.addUpdateListener(msg => channel.postMessage(msg));
 window.addEventListener("hashchange", () => {
   sessionStorage.clear();
   start();
 });
-
-// watch for window resize and force a redraw
 window.addEventListener("resize", () => {
   if (!Globals.state) return;
   Globals.state.update();

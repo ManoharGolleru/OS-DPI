@@ -178,6 +178,18 @@ export function getPanelMenuItems(type) {
   return { child: menuItems, parent: [...parentItems.values()] };
 }
 
+
+/** Build the editor root, stripping "/client" if we are on that page */
+function editorRoot() {
+  const parts = window.location.pathname.split("/");
+  // /session/<sid>/client  →  ["", "session", sid, "client"]
+  // /session/<sid>         →  ["", "session", sid          ]
+  if (parts[3] === "client") parts.pop();          // remove "client"
+  return parts.join("/") || "/";                   // join back to string
+}
+
+
+
 /** @param {ToolBar} bar */
 function getFileMenuItems(bar) {
   return [
@@ -193,34 +205,49 @@ function getFileMenuItems(bar) {
         })
           .then((file) => pleaseWait(local_db.readDesignFromFile(file)))
           .then(() => {
-            window.open(`#${local_db.designName}`, "_blank", `noopener=true`);
+            window.open(
+              `${editorRoot()}#${local_db.designName}`,
+              "_blank",
+              "noopener"
+            );
           })
-          .catch((e) => console.log(e));
+          .catch(console.log);
       },
     }),
     new MenuItem({
       label: "Import URL",
-      callback: () => bar.importURLDialog.open(),
+      callback: () =>
+        bar.importURLDialog.open().then((designName) => {
+          if (designName) {
+            window.open(
+              `${editorRoot()}#${designName}`,
+              "_blank",
+              "noopener"
+            );
+          }
+        }),
     }),
     new MenuItem({
       label: "Export",
-      callback: () => {
-        db.saveDesign();
-      },
+      callback: () => db.saveDesign(),
     }),
     new MenuItem({
       label: "New",
       callback: async () => {
         const name = await db.uniqueName("new");
-        window.open(`#${name}`, "_blank", `noopener=true`);
+        window.open(
+          `${editorRoot()}#${name}`,
+          "_blank",
+          "noopener"
+        );
       },
     }),
     new MenuItem({
       label: "Open",
-      callback: () => {
-        bar.designListDialog.open();
-      },
+      callback: () => bar.designListDialog.open(),
     }),
+
+
     new MenuItem({
       label: "Unload",
       callback: async () => {
@@ -686,25 +713,39 @@ class ImportURLDialog {
   }
 }
 
+
+
 export class ToolBar extends TreeBase {
   constructor() {
     super();
-    this.fileMenu = new Menu("File", getFileMenuItems, this);
-    this.editMenu = new Menu("Edit", getEditMenuItems);
-    this.addMenu = new Menu(
+    this.fileMenu        = new Menu("File", getFileMenuItems, this);
+    this.editMenu        = new Menu("Edit", getEditMenuItems);
+    this.addMenu         = new Menu(
       "Add",
       () => {
         const { child, parent } = getPanelMenuItems("add");
-        if (parent.length > 0) {
-          parent[0].divider = "Parent" + (parent.length > 1 ? "s" : "");
-        }
+        if (parent.length) parent[0].divider = "Parent" + (parent.length > 1 ? "s" : "");
         return child.concat(parent);
       },
       "add",
     );
-    this.helpMenu = new Menu("Help", getHelpMenuItems, this);
+    this.helpMenu        = new Menu("Help", getHelpMenuItems, this);
     this.designListDialog = new DesignListDialog();
-    this.importURLDialog = new ImportURLDialog();
+    this.importURLDialog  = new ImportURLDialog();
+  }
+
+  /* Collaboration URL for the active session + current #hash  */
+  get clientURL() {
+    const [, , sessionId] = window.location.pathname.split("/");
+    const hash            = window.location.hash;          // includes leading “#” or ""
+    return `${location.origin}/session/${sessionId}/client${hash}`;
+  }
+
+  /* Copy URL to clipboard and/or open new tab */
+  openClient() {
+    const url = this.clientURL;
+    navigator.clipboard.writeText(url).catch(() => {});
+    window.open(url, "_blank", "noopener");
   }
 
   template() {
@@ -719,41 +760,37 @@ export class ToolBar extends TreeBase {
                 type="text"
                 .value=${db.designName}
                 .size=${Math.max(db.designName.length, 12)}
-                @change=${(/** @type {InputEventWithTarget} */ event) =>
-                  db
-                    .renameDesign(event.target.value)
-                    .then(() => (window.location.hash = db.designName))}
+                @change=${(e) =>
+                  db.renameDesign(e.target.value).then(() => (window.location.hash = db.designName))}
               />`,
               "N",
             )}
           </li>
+
+          <li>${hinted(this.fileMenu.render(), "F")}</li>
+          <li>${hinted(this.editMenu.render(), "E")}</li>
+          <li>${hinted(this.addMenu.render(), "A")}</li>
+          <li>${hinted(this.helpMenu.render(), "H")}</li>
+
+          <!-- Client link button -->
           <li>
-            ${
-              // @ts-ignore
-              hinted(this.fileMenu.render(), "F")
-            }
+            ${hinted(
+              html`<button
+                class="client-btn"
+                title="Open read-only client & copy link"
+                @click=${() => this.openClient()}
+              >
+                Client
+              </button>`,
+              "C",
+            )}
           </li>
-          <li>
-            ${
-              // @ts-ignore
-              hinted(this.editMenu.render(), "E")
-            }
-          </li>
-          <li>
-            ${
-              // @ts-ignore
-              hinted(this.addMenu.render(), "A")
-            }
-          </li>
-          <li>
-            ${
-              // @ts-ignore
-              hinted(this.helpMenu.render(), "H")
-            }
-          </li>
+
           <li>${workerUpdateButton()}</li>
         </ul>
-        ${this.designListDialog.template()} ${this.importURLDialog.template()}
+
+        ${this.designListDialog.template()}
+        ${this.importURLDialog.template()}
       </div>
     `;
   }

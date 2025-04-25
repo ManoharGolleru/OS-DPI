@@ -1,82 +1,60 @@
-// Interface to the service worker for offline
+/* ------------------------------------------------------------------
+   PWA helper – registers the Service Worker once and lets the app
+   poke it for updates.  ONLY referenced from start.js
+------------------------------------------------------------------- */
 
 import { html } from "uhtml";
 import "css/serviceWorker.css";
 
-/** A pointer to the service worker
- * @type {ServiceWorkerRegistration} */
+/** @type {ServiceWorkerRegistration | undefined} */
 let registration;
 
-/**
- * Ask the service worker to check for an update
- */
+/* ── API called from start.js after every render ──────────────── */
 export function workerCheckForUpdate() {
-  if (registration) {
-    registration.update();
-  }
+  registration?.update().catch(console.error);
 }
 
-/**
- * Show the update button when an update is available
- */
-function signalUpdateAvailable() {
+/* ── internal ─────────────────────────────────────────────────── */
+function showUpdateButton() {
   document.body.classList.add("update-available");
 }
 
-// only start the service worker in production mode
-if (import.meta.env.PROD && navigator.serviceWorker) {
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
-    registration = await navigator.serviceWorker.register("service-worker.js", {
-      scope: "/OS-DPI/",
-    });
-    // ensure the case when the updatefound event was missed is also handled
-    // by re-invoking the prompt when there's a waiting Service Worker
-    if (registration.waiting) {
-      signalUpdateAvailable();
-    }
+    try {
+      /*  ABSOLUTE path avoids /session/<id>/service-worker.js mistakes */
+      registration = await navigator.serviceWorker.register("/service-worker.js", {
+        scope: "/",               // may control the whole origin
+      });
 
-    // detect Service Worker update available and wait for it to become installed
-    registration.addEventListener("updatefound", () => {
-      if (registration.installing) {
-        // wait until the new Service worker is actually installed (ready to take over)
-        registration.installing.addEventListener("statechange", () => {
-          if (registration.waiting) {
-            // if there's an existing controller (previous Service Worker), show the prompt
-            if (navigator.serviceWorker.controller) {
-              signalUpdateAvailable();
-            } else {
-              // otherwise it's the first install, nothing to do
-              console.log("Service Worker initialized for the first time");
+      /* missed-event safety net */
+      if (registration.waiting) showUpdateButton();
+
+      registration.addEventListener("updatefound", () => {
+        const sw = registration.installing;
+        if (sw)
+          sw.addEventListener("statechange", () => {
+            if (registration.waiting && navigator.serviceWorker.controller) {
+              showUpdateButton();
             }
-          }
-        });
-      }
-    });
+          });
+      });
 
-    let refreshing = false;
-
-    // detect controller change and refresh the page
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (!refreshing) {
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
         window.location.reload();
-        refreshing = true;
-      }
-    });
+      });
+    } catch (err) {
+      console.error("SW registration failed:", err);
+    }
   });
 }
 
-/**
- * Return a button for updating the service worker
- * CSS assures this is only visible when an update is available
- * @returns {Hole}
- */
+/* ── optional UI element ──────────────────────────────────────── */
 export function workerUpdateButton() {
   return html`<button
     id="update-available-button"
     @click=${() => {
-      if (registration && registration.waiting) {
-        registration.waiting.postMessage("SKIP_WAITING");
-      }
+      if (registration?.waiting) registration.waiting.postMessage("SKIP_WAITING");
     }}
     title="Click to update the app"
   >

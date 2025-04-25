@@ -590,6 +590,4030 @@ true&&(function polyfill() {
 
 })();
 
+const PACKET_TYPES = Object.create(null); // no Map = no polyfill
+PACKET_TYPES["open"] = "0";
+PACKET_TYPES["close"] = "1";
+PACKET_TYPES["ping"] = "2";
+PACKET_TYPES["pong"] = "3";
+PACKET_TYPES["message"] = "4";
+PACKET_TYPES["upgrade"] = "5";
+PACKET_TYPES["noop"] = "6";
+const PACKET_TYPES_REVERSE = Object.create(null);
+Object.keys(PACKET_TYPES).forEach((key) => {
+    PACKET_TYPES_REVERSE[PACKET_TYPES[key]] = key;
+});
+const ERROR_PACKET = { type: "error", data: "parser error" };
+
+const withNativeBlob$1 = typeof Blob === "function" ||
+    (typeof Blob !== "undefined" &&
+        Object.prototype.toString.call(Blob) === "[object BlobConstructor]");
+const withNativeArrayBuffer$2 = typeof ArrayBuffer === "function";
+// ArrayBuffer.isView method is not defined in IE10
+const isView$1 = (obj) => {
+    return typeof ArrayBuffer.isView === "function"
+        ? ArrayBuffer.isView(obj)
+        : obj && obj.buffer instanceof ArrayBuffer;
+};
+const encodePacket = ({ type, data }, supportsBinary, callback) => {
+    if (withNativeBlob$1 && data instanceof Blob) {
+        if (supportsBinary) {
+            return callback(data);
+        }
+        else {
+            return encodeBlobAsBase64(data, callback);
+        }
+    }
+    else if (withNativeArrayBuffer$2 &&
+        (data instanceof ArrayBuffer || isView$1(data))) {
+        if (supportsBinary) {
+            return callback(data);
+        }
+        else {
+            return encodeBlobAsBase64(new Blob([data]), callback);
+        }
+    }
+    // plain string
+    return callback(PACKET_TYPES[type] + (data || ""));
+};
+const encodeBlobAsBase64 = (data, callback) => {
+    const fileReader = new FileReader();
+    fileReader.onload = function () {
+        const content = fileReader.result.split(",")[1];
+        callback("b" + (content || ""));
+    };
+    return fileReader.readAsDataURL(data);
+};
+function toArray(data) {
+    if (data instanceof Uint8Array) {
+        return data;
+    }
+    else if (data instanceof ArrayBuffer) {
+        return new Uint8Array(data);
+    }
+    else {
+        return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+    }
+}
+let TEXT_ENCODER;
+function encodePacketToBinary(packet, callback) {
+    if (withNativeBlob$1 && packet.data instanceof Blob) {
+        return packet.data.arrayBuffer().then(toArray).then(callback);
+    }
+    else if (withNativeArrayBuffer$2 &&
+        (packet.data instanceof ArrayBuffer || isView$1(packet.data))) {
+        return callback(toArray(packet.data));
+    }
+    encodePacket(packet, false, (encoded) => {
+        if (!TEXT_ENCODER) {
+            TEXT_ENCODER = new TextEncoder();
+        }
+        callback(TEXT_ENCODER.encode(encoded));
+    });
+}
+
+// imported from https://github.com/socketio/base64-arraybuffer
+const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+// Use a lookup table to find the index.
+const lookup$1 = typeof Uint8Array === 'undefined' ? [] : new Uint8Array(256);
+for (let i = 0; i < chars.length; i++) {
+    lookup$1[chars.charCodeAt(i)] = i;
+}
+const decode$1 = (base64) => {
+    let bufferLength = base64.length * 0.75, len = base64.length, i, p = 0, encoded1, encoded2, encoded3, encoded4;
+    if (base64[base64.length - 1] === '=') {
+        bufferLength--;
+        if (base64[base64.length - 2] === '=') {
+            bufferLength--;
+        }
+    }
+    const arraybuffer = new ArrayBuffer(bufferLength), bytes = new Uint8Array(arraybuffer);
+    for (i = 0; i < len; i += 4) {
+        encoded1 = lookup$1[base64.charCodeAt(i)];
+        encoded2 = lookup$1[base64.charCodeAt(i + 1)];
+        encoded3 = lookup$1[base64.charCodeAt(i + 2)];
+        encoded4 = lookup$1[base64.charCodeAt(i + 3)];
+        bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+        bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+        bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+    }
+    return arraybuffer;
+};
+
+const withNativeArrayBuffer$1 = typeof ArrayBuffer === "function";
+const decodePacket = (encodedPacket, binaryType) => {
+    if (typeof encodedPacket !== "string") {
+        return {
+            type: "message",
+            data: mapBinary(encodedPacket, binaryType),
+        };
+    }
+    const type = encodedPacket.charAt(0);
+    if (type === "b") {
+        return {
+            type: "message",
+            data: decodeBase64Packet(encodedPacket.substring(1), binaryType),
+        };
+    }
+    const packetType = PACKET_TYPES_REVERSE[type];
+    if (!packetType) {
+        return ERROR_PACKET;
+    }
+    return encodedPacket.length > 1
+        ? {
+            type: PACKET_TYPES_REVERSE[type],
+            data: encodedPacket.substring(1),
+        }
+        : {
+            type: PACKET_TYPES_REVERSE[type],
+        };
+};
+const decodeBase64Packet = (data, binaryType) => {
+    if (withNativeArrayBuffer$1) {
+        const decoded = decode$1(data);
+        return mapBinary(decoded, binaryType);
+    }
+    else {
+        return { base64: true, data }; // fallback for old browsers
+    }
+};
+const mapBinary = (data, binaryType) => {
+    switch (binaryType) {
+        case "blob":
+            if (data instanceof Blob) {
+                // from WebSocket + binaryType "blob"
+                return data;
+            }
+            else {
+                // from HTTP long-polling or WebTransport
+                return new Blob([data]);
+            }
+        case "arraybuffer":
+        default:
+            if (data instanceof ArrayBuffer) {
+                // from HTTP long-polling (base64) or WebSocket + binaryType "arraybuffer"
+                return data;
+            }
+            else {
+                // from WebTransport (Uint8Array)
+                return data.buffer;
+            }
+    }
+};
+
+const SEPARATOR = String.fromCharCode(30); // see https://en.wikipedia.org/wiki/Delimiter#ASCII_delimited_text
+const encodePayload = (packets, callback) => {
+    // some packets may be added to the array while encoding, so the initial length must be saved
+    const length = packets.length;
+    const encodedPackets = new Array(length);
+    let count = 0;
+    packets.forEach((packet, i) => {
+        // force base64 encoding for binary packets
+        encodePacket(packet, false, (encodedPacket) => {
+            encodedPackets[i] = encodedPacket;
+            if (++count === length) {
+                callback(encodedPackets.join(SEPARATOR));
+            }
+        });
+    });
+};
+const decodePayload = (encodedPayload, binaryType) => {
+    const encodedPackets = encodedPayload.split(SEPARATOR);
+    const packets = [];
+    for (let i = 0; i < encodedPackets.length; i++) {
+        const decodedPacket = decodePacket(encodedPackets[i], binaryType);
+        packets.push(decodedPacket);
+        if (decodedPacket.type === "error") {
+            break;
+        }
+    }
+    return packets;
+};
+function createPacketEncoderStream() {
+    return new TransformStream({
+        transform(packet, controller) {
+            encodePacketToBinary(packet, (encodedPacket) => {
+                const payloadLength = encodedPacket.length;
+                let header;
+                // inspired by the WebSocket format: https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers#decoding_payload_length
+                if (payloadLength < 126) {
+                    header = new Uint8Array(1);
+                    new DataView(header.buffer).setUint8(0, payloadLength);
+                }
+                else if (payloadLength < 65536) {
+                    header = new Uint8Array(3);
+                    const view = new DataView(header.buffer);
+                    view.setUint8(0, 126);
+                    view.setUint16(1, payloadLength);
+                }
+                else {
+                    header = new Uint8Array(9);
+                    const view = new DataView(header.buffer);
+                    view.setUint8(0, 127);
+                    view.setBigUint64(1, BigInt(payloadLength));
+                }
+                // first bit indicates whether the payload is plain text (0) or binary (1)
+                if (packet.data && typeof packet.data !== "string") {
+                    header[0] |= 0x80;
+                }
+                controller.enqueue(header);
+                controller.enqueue(encodedPacket);
+            });
+        },
+    });
+}
+let TEXT_DECODER;
+function totalLength(chunks) {
+    return chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+}
+function concatChunks(chunks, size) {
+    if (chunks[0].length === size) {
+        return chunks.shift();
+    }
+    const buffer = new Uint8Array(size);
+    let j = 0;
+    for (let i = 0; i < size; i++) {
+        buffer[i] = chunks[0][j++];
+        if (j === chunks[0].length) {
+            chunks.shift();
+            j = 0;
+        }
+    }
+    if (chunks.length && j < chunks[0].length) {
+        chunks[0] = chunks[0].slice(j);
+    }
+    return buffer;
+}
+function createPacketDecoderStream(maxPayload, binaryType) {
+    if (!TEXT_DECODER) {
+        TEXT_DECODER = new TextDecoder();
+    }
+    const chunks = [];
+    let state = 0 /* State.READ_HEADER */;
+    let expectedLength = -1;
+    let isBinary = false;
+    return new TransformStream({
+        transform(chunk, controller) {
+            chunks.push(chunk);
+            while (true) {
+                if (state === 0 /* State.READ_HEADER */) {
+                    if (totalLength(chunks) < 1) {
+                        break;
+                    }
+                    const header = concatChunks(chunks, 1);
+                    isBinary = (header[0] & 0x80) === 0x80;
+                    expectedLength = header[0] & 0x7f;
+                    if (expectedLength < 126) {
+                        state = 3 /* State.READ_PAYLOAD */;
+                    }
+                    else if (expectedLength === 126) {
+                        state = 1 /* State.READ_EXTENDED_LENGTH_16 */;
+                    }
+                    else {
+                        state = 2 /* State.READ_EXTENDED_LENGTH_64 */;
+                    }
+                }
+                else if (state === 1 /* State.READ_EXTENDED_LENGTH_16 */) {
+                    if (totalLength(chunks) < 2) {
+                        break;
+                    }
+                    const headerArray = concatChunks(chunks, 2);
+                    expectedLength = new DataView(headerArray.buffer, headerArray.byteOffset, headerArray.length).getUint16(0);
+                    state = 3 /* State.READ_PAYLOAD */;
+                }
+                else if (state === 2 /* State.READ_EXTENDED_LENGTH_64 */) {
+                    if (totalLength(chunks) < 8) {
+                        break;
+                    }
+                    const headerArray = concatChunks(chunks, 8);
+                    const view = new DataView(headerArray.buffer, headerArray.byteOffset, headerArray.length);
+                    const n = view.getUint32(0);
+                    if (n > Math.pow(2, 53 - 32) - 1) {
+                        // the maximum safe integer in JavaScript is 2^53 - 1
+                        controller.enqueue(ERROR_PACKET);
+                        break;
+                    }
+                    expectedLength = n * Math.pow(2, 32) + view.getUint32(4);
+                    state = 3 /* State.READ_PAYLOAD */;
+                }
+                else {
+                    if (totalLength(chunks) < expectedLength) {
+                        break;
+                    }
+                    const data = concatChunks(chunks, expectedLength);
+                    controller.enqueue(decodePacket(isBinary ? data : TEXT_DECODER.decode(data), binaryType));
+                    state = 0 /* State.READ_HEADER */;
+                }
+                if (expectedLength === 0 || expectedLength > maxPayload) {
+                    controller.enqueue(ERROR_PACKET);
+                    break;
+                }
+            }
+        },
+    });
+}
+const protocol$1 = 4;
+
+/**
+ * Initialize a new `Emitter`.
+ *
+ * @api public
+ */
+
+function Emitter(obj) {
+  if (obj) return mixin(obj);
+}
+
+/**
+ * Mixin the emitter properties.
+ *
+ * @param {Object} obj
+ * @return {Object}
+ * @api private
+ */
+
+function mixin(obj) {
+  for (var key in Emitter.prototype) {
+    obj[key] = Emitter.prototype[key];
+  }
+  return obj;
+}
+
+/**
+ * Listen on the given `event` with `fn`.
+ *
+ * @param {String} event
+ * @param {Function} fn
+ * @return {Emitter}
+ * @api public
+ */
+
+Emitter.prototype.on =
+Emitter.prototype.addEventListener = function(event, fn){
+  this._callbacks = this._callbacks || {};
+  (this._callbacks['$' + event] = this._callbacks['$' + event] || [])
+    .push(fn);
+  return this;
+};
+
+/**
+ * Adds an `event` listener that will be invoked a single
+ * time then automatically removed.
+ *
+ * @param {String} event
+ * @param {Function} fn
+ * @return {Emitter}
+ * @api public
+ */
+
+Emitter.prototype.once = function(event, fn){
+  function on() {
+    this.off(event, on);
+    fn.apply(this, arguments);
+  }
+
+  on.fn = fn;
+  this.on(event, on);
+  return this;
+};
+
+/**
+ * Remove the given callback for `event` or all
+ * registered callbacks.
+ *
+ * @param {String} event
+ * @param {Function} fn
+ * @return {Emitter}
+ * @api public
+ */
+
+Emitter.prototype.off =
+Emitter.prototype.removeListener =
+Emitter.prototype.removeAllListeners =
+Emitter.prototype.removeEventListener = function(event, fn){
+  this._callbacks = this._callbacks || {};
+
+  // all
+  if (0 == arguments.length) {
+    this._callbacks = {};
+    return this;
+  }
+
+  // specific event
+  var callbacks = this._callbacks['$' + event];
+  if (!callbacks) return this;
+
+  // remove all handlers
+  if (1 == arguments.length) {
+    delete this._callbacks['$' + event];
+    return this;
+  }
+
+  // remove specific handler
+  var cb;
+  for (var i = 0; i < callbacks.length; i++) {
+    cb = callbacks[i];
+    if (cb === fn || cb.fn === fn) {
+      callbacks.splice(i, 1);
+      break;
+    }
+  }
+
+  // Remove event specific arrays for event types that no
+  // one is subscribed for to avoid memory leak.
+  if (callbacks.length === 0) {
+    delete this._callbacks['$' + event];
+  }
+
+  return this;
+};
+
+/**
+ * Emit `event` with the given args.
+ *
+ * @param {String} event
+ * @param {Mixed} ...
+ * @return {Emitter}
+ */
+
+Emitter.prototype.emit = function(event){
+  this._callbacks = this._callbacks || {};
+
+  var args = new Array(arguments.length - 1)
+    , callbacks = this._callbacks['$' + event];
+
+  for (var i = 1; i < arguments.length; i++) {
+    args[i - 1] = arguments[i];
+  }
+
+  if (callbacks) {
+    callbacks = callbacks.slice(0);
+    for (var i = 0, len = callbacks.length; i < len; ++i) {
+      callbacks[i].apply(this, args);
+    }
+  }
+
+  return this;
+};
+
+// alias used for reserved events (protected method)
+Emitter.prototype.emitReserved = Emitter.prototype.emit;
+
+/**
+ * Return array of callbacks for `event`.
+ *
+ * @param {String} event
+ * @return {Array}
+ * @api public
+ */
+
+Emitter.prototype.listeners = function(event){
+  this._callbacks = this._callbacks || {};
+  return this._callbacks['$' + event] || [];
+};
+
+/**
+ * Check if this emitter has `event` handlers.
+ *
+ * @param {String} event
+ * @return {Boolean}
+ * @api public
+ */
+
+Emitter.prototype.hasListeners = function(event){
+  return !! this.listeners(event).length;
+};
+
+const nextTick = (() => {
+    const isPromiseAvailable = typeof Promise === "function" && typeof Promise.resolve === "function";
+    if (isPromiseAvailable) {
+        return (cb) => Promise.resolve().then(cb);
+    }
+    else {
+        return (cb, setTimeoutFn) => setTimeoutFn(cb, 0);
+    }
+})();
+const globalThisShim = (() => {
+    if (typeof self !== "undefined") {
+        return self;
+    }
+    else if (typeof window !== "undefined") {
+        return window;
+    }
+    else {
+        return Function("return this")();
+    }
+})();
+const defaultBinaryType = "arraybuffer";
+function createCookieJar() { }
+
+function pick(obj, ...attr) {
+    return attr.reduce((acc, k) => {
+        if (obj.hasOwnProperty(k)) {
+            acc[k] = obj[k];
+        }
+        return acc;
+    }, {});
+}
+// Keep a reference to the real timeout functions so they can be used when overridden
+const NATIVE_SET_TIMEOUT = globalThisShim.setTimeout;
+const NATIVE_CLEAR_TIMEOUT = globalThisShim.clearTimeout;
+function installTimerFunctions(obj, opts) {
+    if (opts.useNativeTimers) {
+        obj.setTimeoutFn = NATIVE_SET_TIMEOUT.bind(globalThisShim);
+        obj.clearTimeoutFn = NATIVE_CLEAR_TIMEOUT.bind(globalThisShim);
+    }
+    else {
+        obj.setTimeoutFn = globalThisShim.setTimeout.bind(globalThisShim);
+        obj.clearTimeoutFn = globalThisShim.clearTimeout.bind(globalThisShim);
+    }
+}
+// base64 encoded buffers are about 33% bigger (https://en.wikipedia.org/wiki/Base64)
+const BASE64_OVERHEAD = 1.33;
+// we could also have used `new Blob([obj]).size`, but it isn't supported in IE9
+function byteLength(obj) {
+    if (typeof obj === "string") {
+        return utf8Length(obj);
+    }
+    // arraybuffer or blob
+    return Math.ceil((obj.byteLength || obj.size) * BASE64_OVERHEAD);
+}
+function utf8Length(str) {
+    let c = 0, length = 0;
+    for (let i = 0, l = str.length; i < l; i++) {
+        c = str.charCodeAt(i);
+        if (c < 0x80) {
+            length += 1;
+        }
+        else if (c < 0x800) {
+            length += 2;
+        }
+        else if (c < 0xd800 || c >= 0xe000) {
+            length += 3;
+        }
+        else {
+            i++;
+            length += 4;
+        }
+    }
+    return length;
+}
+/**
+ * Generates a random 8-characters string.
+ */
+function randomString() {
+    return (Date.now().toString(36).substring(3) +
+        Math.random().toString(36).substring(2, 5));
+}
+
+// imported from https://github.com/galkn/querystring
+/**
+ * Compiles a querystring
+ * Returns string representation of the object
+ *
+ * @param {Object}
+ * @api private
+ */
+function encode(obj) {
+    let str = '';
+    for (let i in obj) {
+        if (obj.hasOwnProperty(i)) {
+            if (str.length)
+                str += '&';
+            str += encodeURIComponent(i) + '=' + encodeURIComponent(obj[i]);
+        }
+    }
+    return str;
+}
+/**
+ * Parses a simple querystring into an object
+ *
+ * @param {String} qs
+ * @api private
+ */
+function decode(qs) {
+    let qry = {};
+    let pairs = qs.split('&');
+    for (let i = 0, l = pairs.length; i < l; i++) {
+        let pair = pairs[i].split('=');
+        qry[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1]);
+    }
+    return qry;
+}
+
+class TransportError extends Error {
+    constructor(reason, description, context) {
+        super(reason);
+        this.description = description;
+        this.context = context;
+        this.type = "TransportError";
+    }
+}
+class Transport extends Emitter {
+    /**
+     * Transport abstract constructor.
+     *
+     * @param {Object} opts - options
+     * @protected
+     */
+    constructor(opts) {
+        super();
+        this.writable = false;
+        installTimerFunctions(this, opts);
+        this.opts = opts;
+        this.query = opts.query;
+        this.socket = opts.socket;
+        this.supportsBinary = !opts.forceBase64;
+    }
+    /**
+     * Emits an error.
+     *
+     * @param {String} reason
+     * @param description
+     * @param context - the error context
+     * @return {Transport} for chaining
+     * @protected
+     */
+    onError(reason, description, context) {
+        super.emitReserved("error", new TransportError(reason, description, context));
+        return this;
+    }
+    /**
+     * Opens the transport.
+     */
+    open() {
+        this.readyState = "opening";
+        this.doOpen();
+        return this;
+    }
+    /**
+     * Closes the transport.
+     */
+    close() {
+        if (this.readyState === "opening" || this.readyState === "open") {
+            this.doClose();
+            this.onClose();
+        }
+        return this;
+    }
+    /**
+     * Sends multiple packets.
+     *
+     * @param {Array} packets
+     */
+    send(packets) {
+        if (this.readyState === "open") {
+            this.write(packets);
+        }
+    }
+    /**
+     * Called upon open
+     *
+     * @protected
+     */
+    onOpen() {
+        this.readyState = "open";
+        this.writable = true;
+        super.emitReserved("open");
+    }
+    /**
+     * Called with data.
+     *
+     * @param {String} data
+     * @protected
+     */
+    onData(data) {
+        const packet = decodePacket(data, this.socket.binaryType);
+        this.onPacket(packet);
+    }
+    /**
+     * Called with a decoded packet.
+     *
+     * @protected
+     */
+    onPacket(packet) {
+        super.emitReserved("packet", packet);
+    }
+    /**
+     * Called upon close.
+     *
+     * @protected
+     */
+    onClose(details) {
+        this.readyState = "closed";
+        super.emitReserved("close", details);
+    }
+    /**
+     * Pauses the transport, in order not to lose packets during an upgrade.
+     *
+     * @param onPause
+     */
+    pause(onPause) { }
+    createUri(schema, query = {}) {
+        return (schema +
+            "://" +
+            this._hostname() +
+            this._port() +
+            this.opts.path +
+            this._query(query));
+    }
+    _hostname() {
+        const hostname = this.opts.hostname;
+        return hostname.indexOf(":") === -1 ? hostname : "[" + hostname + "]";
+    }
+    _port() {
+        if (this.opts.port &&
+            ((this.opts.secure && Number(this.opts.port !== 443)) ||
+                (!this.opts.secure && Number(this.opts.port) !== 80))) {
+            return ":" + this.opts.port;
+        }
+        else {
+            return "";
+        }
+    }
+    _query(query) {
+        const encodedQuery = encode(query);
+        return encodedQuery.length ? "?" + encodedQuery : "";
+    }
+}
+
+class Polling extends Transport {
+    constructor() {
+        super(...arguments);
+        this._polling = false;
+    }
+    get name() {
+        return "polling";
+    }
+    /**
+     * Opens the socket (triggers polling). We write a PING message to determine
+     * when the transport is open.
+     *
+     * @protected
+     */
+    doOpen() {
+        this._poll();
+    }
+    /**
+     * Pauses polling.
+     *
+     * @param {Function} onPause - callback upon buffers are flushed and transport is paused
+     * @package
+     */
+    pause(onPause) {
+        this.readyState = "pausing";
+        const pause = () => {
+            this.readyState = "paused";
+            onPause();
+        };
+        if (this._polling || !this.writable) {
+            let total = 0;
+            if (this._polling) {
+                total++;
+                this.once("pollComplete", function () {
+                    --total || pause();
+                });
+            }
+            if (!this.writable) {
+                total++;
+                this.once("drain", function () {
+                    --total || pause();
+                });
+            }
+        }
+        else {
+            pause();
+        }
+    }
+    /**
+     * Starts polling cycle.
+     *
+     * @private
+     */
+    _poll() {
+        this._polling = true;
+        this.doPoll();
+        this.emitReserved("poll");
+    }
+    /**
+     * Overloads onData to detect payloads.
+     *
+     * @protected
+     */
+    onData(data) {
+        const callback = (packet) => {
+            // if its the first message we consider the transport open
+            if ("opening" === this.readyState && packet.type === "open") {
+                this.onOpen();
+            }
+            // if its a close packet, we close the ongoing requests
+            if ("close" === packet.type) {
+                this.onClose({ description: "transport closed by the server" });
+                return false;
+            }
+            // otherwise bypass onData and handle the message
+            this.onPacket(packet);
+        };
+        // decode payload
+        decodePayload(data, this.socket.binaryType).forEach(callback);
+        // if an event did not trigger closing
+        if ("closed" !== this.readyState) {
+            // if we got data we're not polling
+            this._polling = false;
+            this.emitReserved("pollComplete");
+            if ("open" === this.readyState) {
+                this._poll();
+            }
+        }
+    }
+    /**
+     * For polling, send a close packet.
+     *
+     * @protected
+     */
+    doClose() {
+        const close = () => {
+            this.write([{ type: "close" }]);
+        };
+        if ("open" === this.readyState) {
+            close();
+        }
+        else {
+            // in case we're trying to close while
+            // handshaking is in progress (GH-164)
+            this.once("open", close);
+        }
+    }
+    /**
+     * Writes a packets payload.
+     *
+     * @param {Array} packets - data packets
+     * @protected
+     */
+    write(packets) {
+        this.writable = false;
+        encodePayload(packets, (data) => {
+            this.doWrite(data, () => {
+                this.writable = true;
+                this.emitReserved("drain");
+            });
+        });
+    }
+    /**
+     * Generates uri for connection.
+     *
+     * @private
+     */
+    uri() {
+        const schema = this.opts.secure ? "https" : "http";
+        const query = this.query || {};
+        // cache busting is forced
+        if (false !== this.opts.timestampRequests) {
+            query[this.opts.timestampParam] = randomString();
+        }
+        if (!this.supportsBinary && !query.sid) {
+            query.b64 = 1;
+        }
+        return this.createUri(schema, query);
+    }
+}
+
+// imported from https://github.com/component/has-cors
+let value = false;
+try {
+    value = typeof XMLHttpRequest !== 'undefined' &&
+        'withCredentials' in new XMLHttpRequest();
+}
+catch (err) {
+    // if XMLHttp support is disabled in IE then it will throw
+    // when trying to create
+}
+const hasCORS = value;
+
+function empty$1() { }
+class BaseXHR extends Polling {
+    /**
+     * XHR Polling constructor.
+     *
+     * @param {Object} opts
+     * @package
+     */
+    constructor(opts) {
+        super(opts);
+        if (typeof location !== "undefined") {
+            const isSSL = "https:" === location.protocol;
+            let port = location.port;
+            // some user agents have empty `location.port`
+            if (!port) {
+                port = isSSL ? "443" : "80";
+            }
+            this.xd =
+                (typeof location !== "undefined" &&
+                    opts.hostname !== location.hostname) ||
+                    port !== opts.port;
+        }
+    }
+    /**
+     * Sends data.
+     *
+     * @param {String} data to send.
+     * @param {Function} called upon flush.
+     * @private
+     */
+    doWrite(data, fn) {
+        const req = this.request({
+            method: "POST",
+            data: data,
+        });
+        req.on("success", fn);
+        req.on("error", (xhrStatus, context) => {
+            this.onError("xhr post error", xhrStatus, context);
+        });
+    }
+    /**
+     * Starts a poll cycle.
+     *
+     * @private
+     */
+    doPoll() {
+        const req = this.request();
+        req.on("data", this.onData.bind(this));
+        req.on("error", (xhrStatus, context) => {
+            this.onError("xhr poll error", xhrStatus, context);
+        });
+        this.pollXhr = req;
+    }
+}
+class Request extends Emitter {
+    /**
+     * Request constructor
+     *
+     * @param {Object} options
+     * @package
+     */
+    constructor(createRequest, uri, opts) {
+        super();
+        this.createRequest = createRequest;
+        installTimerFunctions(this, opts);
+        this._opts = opts;
+        this._method = opts.method || "GET";
+        this._uri = uri;
+        this._data = undefined !== opts.data ? opts.data : null;
+        this._create();
+    }
+    /**
+     * Creates the XHR object and sends the request.
+     *
+     * @private
+     */
+    _create() {
+        var _a;
+        const opts = pick(this._opts, "agent", "pfx", "key", "passphrase", "cert", "ca", "ciphers", "rejectUnauthorized", "autoUnref");
+        opts.xdomain = !!this._opts.xd;
+        const xhr = (this._xhr = this.createRequest(opts));
+        try {
+            xhr.open(this._method, this._uri, true);
+            try {
+                if (this._opts.extraHeaders) {
+                    // @ts-ignore
+                    xhr.setDisableHeaderCheck && xhr.setDisableHeaderCheck(true);
+                    for (let i in this._opts.extraHeaders) {
+                        if (this._opts.extraHeaders.hasOwnProperty(i)) {
+                            xhr.setRequestHeader(i, this._opts.extraHeaders[i]);
+                        }
+                    }
+                }
+            }
+            catch (e) { }
+            if ("POST" === this._method) {
+                try {
+                    xhr.setRequestHeader("Content-type", "text/plain;charset=UTF-8");
+                }
+                catch (e) { }
+            }
+            try {
+                xhr.setRequestHeader("Accept", "*/*");
+            }
+            catch (e) { }
+            (_a = this._opts.cookieJar) === null || _a === void 0 ? void 0 : _a.addCookies(xhr);
+            // ie6 check
+            if ("withCredentials" in xhr) {
+                xhr.withCredentials = this._opts.withCredentials;
+            }
+            if (this._opts.requestTimeout) {
+                xhr.timeout = this._opts.requestTimeout;
+            }
+            xhr.onreadystatechange = () => {
+                var _a;
+                if (xhr.readyState === 3) {
+                    (_a = this._opts.cookieJar) === null || _a === void 0 ? void 0 : _a.parseCookies(
+                    // @ts-ignore
+                    xhr.getResponseHeader("set-cookie"));
+                }
+                if (4 !== xhr.readyState)
+                    return;
+                if (200 === xhr.status || 1223 === xhr.status) {
+                    this._onLoad();
+                }
+                else {
+                    // make sure the `error` event handler that's user-set
+                    // does not throw in the same tick and gets caught here
+                    this.setTimeoutFn(() => {
+                        this._onError(typeof xhr.status === "number" ? xhr.status : 0);
+                    }, 0);
+                }
+            };
+            xhr.send(this._data);
+        }
+        catch (e) {
+            // Need to defer since .create() is called directly from the constructor
+            // and thus the 'error' event can only be only bound *after* this exception
+            // occurs.  Therefore, also, we cannot throw here at all.
+            this.setTimeoutFn(() => {
+                this._onError(e);
+            }, 0);
+            return;
+        }
+        if (typeof document !== "undefined") {
+            this._index = Request.requestsCount++;
+            Request.requests[this._index] = this;
+        }
+    }
+    /**
+     * Called upon error.
+     *
+     * @private
+     */
+    _onError(err) {
+        this.emitReserved("error", err, this._xhr);
+        this._cleanup(true);
+    }
+    /**
+     * Cleans up house.
+     *
+     * @private
+     */
+    _cleanup(fromError) {
+        if ("undefined" === typeof this._xhr || null === this._xhr) {
+            return;
+        }
+        this._xhr.onreadystatechange = empty$1;
+        if (fromError) {
+            try {
+                this._xhr.abort();
+            }
+            catch (e) { }
+        }
+        if (typeof document !== "undefined") {
+            delete Request.requests[this._index];
+        }
+        this._xhr = null;
+    }
+    /**
+     * Called upon load.
+     *
+     * @private
+     */
+    _onLoad() {
+        const data = this._xhr.responseText;
+        if (data !== null) {
+            this.emitReserved("data", data);
+            this.emitReserved("success");
+            this._cleanup();
+        }
+    }
+    /**
+     * Aborts the request.
+     *
+     * @package
+     */
+    abort() {
+        this._cleanup();
+    }
+}
+Request.requestsCount = 0;
+Request.requests = {};
+/**
+ * Aborts pending requests when unloading the window. This is needed to prevent
+ * memory leaks (e.g. when using IE) and to ensure that no spurious error is
+ * emitted.
+ */
+if (typeof document !== "undefined") {
+    // @ts-ignore
+    if (typeof attachEvent === "function") {
+        // @ts-ignore
+        attachEvent("onunload", unloadHandler);
+    }
+    else if (typeof addEventListener === "function") {
+        const terminationEvent = "onpagehide" in globalThisShim ? "pagehide" : "unload";
+        addEventListener(terminationEvent, unloadHandler, false);
+    }
+}
+function unloadHandler() {
+    for (let i in Request.requests) {
+        if (Request.requests.hasOwnProperty(i)) {
+            Request.requests[i].abort();
+        }
+    }
+}
+const hasXHR2 = (function () {
+    const xhr = newRequest({
+        xdomain: false,
+    });
+    return xhr && xhr.responseType !== null;
+})();
+/**
+ * HTTP long-polling based on the built-in `XMLHttpRequest` object.
+ *
+ * Usage: browser
+ *
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest
+ */
+class XHR extends BaseXHR {
+    constructor(opts) {
+        super(opts);
+        const forceBase64 = opts && opts.forceBase64;
+        this.supportsBinary = hasXHR2 && !forceBase64;
+    }
+    request(opts = {}) {
+        Object.assign(opts, { xd: this.xd }, this.opts);
+        return new Request(newRequest, this.uri(), opts);
+    }
+}
+function newRequest(opts) {
+    const xdomain = opts.xdomain;
+    // XMLHttpRequest can be disabled on IE
+    try {
+        if ("undefined" !== typeof XMLHttpRequest && (!xdomain || hasCORS)) {
+            return new XMLHttpRequest();
+        }
+    }
+    catch (e) { }
+    if (!xdomain) {
+        try {
+            return new globalThisShim[["Active"].concat("Object").join("X")]("Microsoft.XMLHTTP");
+        }
+        catch (e) { }
+    }
+}
+
+// detect ReactNative environment
+const isReactNative = typeof navigator !== "undefined" &&
+    typeof navigator.product === "string" &&
+    navigator.product.toLowerCase() === "reactnative";
+class BaseWS extends Transport {
+    get name() {
+        return "websocket";
+    }
+    doOpen() {
+        const uri = this.uri();
+        const protocols = this.opts.protocols;
+        // React Native only supports the 'headers' option, and will print a warning if anything else is passed
+        const opts = isReactNative
+            ? {}
+            : pick(this.opts, "agent", "perMessageDeflate", "pfx", "key", "passphrase", "cert", "ca", "ciphers", "rejectUnauthorized", "localAddress", "protocolVersion", "origin", "maxPayload", "family", "checkServerIdentity");
+        if (this.opts.extraHeaders) {
+            opts.headers = this.opts.extraHeaders;
+        }
+        try {
+            this.ws = this.createSocket(uri, protocols, opts);
+        }
+        catch (err) {
+            return this.emitReserved("error", err);
+        }
+        this.ws.binaryType = this.socket.binaryType;
+        this.addEventListeners();
+    }
+    /**
+     * Adds event listeners to the socket
+     *
+     * @private
+     */
+    addEventListeners() {
+        this.ws.onopen = () => {
+            if (this.opts.autoUnref) {
+                this.ws._socket.unref();
+            }
+            this.onOpen();
+        };
+        this.ws.onclose = (closeEvent) => this.onClose({
+            description: "websocket connection closed",
+            context: closeEvent,
+        });
+        this.ws.onmessage = (ev) => this.onData(ev.data);
+        this.ws.onerror = (e) => this.onError("websocket error", e);
+    }
+    write(packets) {
+        this.writable = false;
+        // encodePacket efficient as it uses WS framing
+        // no need for encodePayload
+        for (let i = 0; i < packets.length; i++) {
+            const packet = packets[i];
+            const lastPacket = i === packets.length - 1;
+            encodePacket(packet, this.supportsBinary, (data) => {
+                // Sometimes the websocket has already been closed but the browser didn't
+                // have a chance of informing us about it yet, in that case send will
+                // throw an error
+                try {
+                    this.doWrite(packet, data);
+                }
+                catch (e) {
+                }
+                if (lastPacket) {
+                    // fake drain
+                    // defer to next tick to allow Socket to clear writeBuffer
+                    nextTick(() => {
+                        this.writable = true;
+                        this.emitReserved("drain");
+                    }, this.setTimeoutFn);
+                }
+            });
+        }
+    }
+    doClose() {
+        if (typeof this.ws !== "undefined") {
+            this.ws.onerror = () => { };
+            this.ws.close();
+            this.ws = null;
+        }
+    }
+    /**
+     * Generates uri for connection.
+     *
+     * @private
+     */
+    uri() {
+        const schema = this.opts.secure ? "wss" : "ws";
+        const query = this.query || {};
+        // append timestamp to URI
+        if (this.opts.timestampRequests) {
+            query[this.opts.timestampParam] = randomString();
+        }
+        // communicate binary support capabilities
+        if (!this.supportsBinary) {
+            query.b64 = 1;
+        }
+        return this.createUri(schema, query);
+    }
+}
+const WebSocketCtor = globalThisShim.WebSocket || globalThisShim.MozWebSocket;
+/**
+ * WebSocket transport based on the built-in `WebSocket` object.
+ *
+ * Usage: browser, Node.js (since v21), Deno, Bun
+ *
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
+ * @see https://caniuse.com/mdn-api_websocket
+ * @see https://nodejs.org/api/globals.html#websocket
+ */
+class WS extends BaseWS {
+    createSocket(uri, protocols, opts) {
+        return !isReactNative
+            ? protocols
+                ? new WebSocketCtor(uri, protocols)
+                : new WebSocketCtor(uri)
+            : new WebSocketCtor(uri, protocols, opts);
+    }
+    doWrite(_packet, data) {
+        this.ws.send(data);
+    }
+}
+
+/**
+ * WebTransport transport based on the built-in `WebTransport` object.
+ *
+ * Usage: browser, Node.js (with the `@fails-components/webtransport` package)
+ *
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/WebTransport
+ * @see https://caniuse.com/webtransport
+ */
+class WT extends Transport {
+    get name() {
+        return "webtransport";
+    }
+    doOpen() {
+        try {
+            // @ts-ignore
+            this._transport = new WebTransport(this.createUri("https"), this.opts.transportOptions[this.name]);
+        }
+        catch (err) {
+            return this.emitReserved("error", err);
+        }
+        this._transport.closed
+            .then(() => {
+            this.onClose();
+        })
+            .catch((err) => {
+            this.onError("webtransport error", err);
+        });
+        // note: we could have used async/await, but that would require some additional polyfills
+        this._transport.ready.then(() => {
+            this._transport.createBidirectionalStream().then((stream) => {
+                const decoderStream = createPacketDecoderStream(Number.MAX_SAFE_INTEGER, this.socket.binaryType);
+                const reader = stream.readable.pipeThrough(decoderStream).getReader();
+                const encoderStream = createPacketEncoderStream();
+                encoderStream.readable.pipeTo(stream.writable);
+                this._writer = encoderStream.writable.getWriter();
+                const read = () => {
+                    reader
+                        .read()
+                        .then(({ done, value }) => {
+                        if (done) {
+                            return;
+                        }
+                        this.onPacket(value);
+                        read();
+                    })
+                        .catch((err) => {
+                    });
+                };
+                read();
+                const packet = { type: "open" };
+                if (this.query.sid) {
+                    packet.data = `{"sid":"${this.query.sid}"}`;
+                }
+                this._writer.write(packet).then(() => this.onOpen());
+            });
+        });
+    }
+    write(packets) {
+        this.writable = false;
+        for (let i = 0; i < packets.length; i++) {
+            const packet = packets[i];
+            const lastPacket = i === packets.length - 1;
+            this._writer.write(packet).then(() => {
+                if (lastPacket) {
+                    nextTick(() => {
+                        this.writable = true;
+                        this.emitReserved("drain");
+                    }, this.setTimeoutFn);
+                }
+            });
+        }
+    }
+    doClose() {
+        var _a;
+        (_a = this._transport) === null || _a === void 0 ? void 0 : _a.close();
+    }
+}
+
+const transports = {
+    websocket: WS,
+    webtransport: WT,
+    polling: XHR,
+};
+
+// imported from https://github.com/galkn/parseuri
+/**
+ * Parses a URI
+ *
+ * Note: we could also have used the built-in URL object, but it isn't supported on all platforms.
+ *
+ * See:
+ * - https://developer.mozilla.org/en-US/docs/Web/API/URL
+ * - https://caniuse.com/url
+ * - https://www.rfc-editor.org/rfc/rfc3986#appendix-B
+ *
+ * History of the parse() method:
+ * - first commit: https://github.com/socketio/socket.io-client/commit/4ee1d5d94b3906a9c052b459f1a818b15f38f91c
+ * - export into its own module: https://github.com/socketio/engine.io-client/commit/de2c561e4564efeb78f1bdb1ba39ef81b2822cb3
+ * - reimport: https://github.com/socketio/engine.io-client/commit/df32277c3f6d622eec5ed09f493cae3f3391d242
+ *
+ * @author Steven Levithan <stevenlevithan.com> (MIT license)
+ * @api private
+ */
+const re = /^(?:(?![^:@\/?#]+:[^:@\/]*@)(http|https|ws|wss):\/\/)?((?:(([^:@\/?#]*)(?::([^:@\/?#]*))?)?@)?((?:[a-f0-9]{0,4}:){2,7}[a-f0-9]{0,4}|[^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/;
+const parts = [
+    'source', 'protocol', 'authority', 'userInfo', 'user', 'password', 'host', 'port', 'relative', 'path', 'directory', 'file', 'query', 'anchor'
+];
+function parse$4(str) {
+    if (str.length > 8000) {
+        throw "URI too long";
+    }
+    const src = str, b = str.indexOf('['), e = str.indexOf(']');
+    if (b != -1 && e != -1) {
+        str = str.substring(0, b) + str.substring(b, e).replace(/:/g, ';') + str.substring(e, str.length);
+    }
+    let m = re.exec(str || ''), uri = {}, i = 14;
+    while (i--) {
+        uri[parts[i]] = m[i] || '';
+    }
+    if (b != -1 && e != -1) {
+        uri.source = src;
+        uri.host = uri.host.substring(1, uri.host.length - 1).replace(/;/g, ':');
+        uri.authority = uri.authority.replace('[', '').replace(']', '').replace(/;/g, ':');
+        uri.ipv6uri = true;
+    }
+    uri.pathNames = pathNames(uri, uri['path']);
+    uri.queryKey = queryKey(uri, uri['query']);
+    return uri;
+}
+function pathNames(obj, path) {
+    const regx = /\/{2,9}/g, names = path.replace(regx, "/").split("/");
+    if (path.slice(0, 1) == '/' || path.length === 0) {
+        names.splice(0, 1);
+    }
+    if (path.slice(-1) == '/') {
+        names.splice(names.length - 1, 1);
+    }
+    return names;
+}
+function queryKey(uri, query) {
+    const data = {};
+    query.replace(/(?:^|&)([^&=]*)=?([^&]*)/g, function ($0, $1, $2) {
+        if ($1) {
+            data[$1] = $2;
+        }
+    });
+    return data;
+}
+
+const withEventListeners = typeof addEventListener === "function" &&
+    typeof removeEventListener === "function";
+const OFFLINE_EVENT_LISTENERS = [];
+if (withEventListeners) {
+    // within a ServiceWorker, any event handler for the 'offline' event must be added on the initial evaluation of the
+    // script, so we create one single event listener here which will forward the event to the socket instances
+    addEventListener("offline", () => {
+        OFFLINE_EVENT_LISTENERS.forEach((listener) => listener());
+    }, false);
+}
+/**
+ * This class provides a WebSocket-like interface to connect to an Engine.IO server. The connection will be established
+ * with one of the available low-level transports, like HTTP long-polling, WebSocket or WebTransport.
+ *
+ * This class comes without upgrade mechanism, which means that it will keep the first low-level transport that
+ * successfully establishes the connection.
+ *
+ * In order to allow tree-shaking, there are no transports included, that's why the `transports` option is mandatory.
+ *
+ * @example
+ * import { SocketWithoutUpgrade, WebSocket } from "engine.io-client";
+ *
+ * const socket = new SocketWithoutUpgrade({
+ *   transports: [WebSocket]
+ * });
+ *
+ * socket.on("open", () => {
+ *   socket.send("hello");
+ * });
+ *
+ * @see SocketWithUpgrade
+ * @see Socket
+ */
+class SocketWithoutUpgrade extends Emitter {
+    /**
+     * Socket constructor.
+     *
+     * @param {String|Object} uri - uri or options
+     * @param {Object} opts - options
+     */
+    constructor(uri, opts) {
+        super();
+        this.binaryType = defaultBinaryType;
+        this.writeBuffer = [];
+        this._prevBufferLen = 0;
+        this._pingInterval = -1;
+        this._pingTimeout = -1;
+        this._maxPayload = -1;
+        /**
+         * The expiration timestamp of the {@link _pingTimeoutTimer} object is tracked, in case the timer is throttled and the
+         * callback is not fired on time. This can happen for example when a laptop is suspended or when a phone is locked.
+         */
+        this._pingTimeoutTime = Infinity;
+        if (uri && "object" === typeof uri) {
+            opts = uri;
+            uri = null;
+        }
+        if (uri) {
+            const parsedUri = parse$4(uri);
+            opts.hostname = parsedUri.host;
+            opts.secure =
+                parsedUri.protocol === "https" || parsedUri.protocol === "wss";
+            opts.port = parsedUri.port;
+            if (parsedUri.query)
+                opts.query = parsedUri.query;
+        }
+        else if (opts.host) {
+            opts.hostname = parse$4(opts.host).host;
+        }
+        installTimerFunctions(this, opts);
+        this.secure =
+            null != opts.secure
+                ? opts.secure
+                : typeof location !== "undefined" && "https:" === location.protocol;
+        if (opts.hostname && !opts.port) {
+            // if no port is specified manually, use the protocol default
+            opts.port = this.secure ? "443" : "80";
+        }
+        this.hostname =
+            opts.hostname ||
+                (typeof location !== "undefined" ? location.hostname : "localhost");
+        this.port =
+            opts.port ||
+                (typeof location !== "undefined" && location.port
+                    ? location.port
+                    : this.secure
+                        ? "443"
+                        : "80");
+        this.transports = [];
+        this._transportsByName = {};
+        opts.transports.forEach((t) => {
+            const transportName = t.prototype.name;
+            this.transports.push(transportName);
+            this._transportsByName[transportName] = t;
+        });
+        this.opts = Object.assign({
+            path: "/engine.io",
+            agent: false,
+            withCredentials: false,
+            upgrade: true,
+            timestampParam: "t",
+            rememberUpgrade: false,
+            addTrailingSlash: true,
+            rejectUnauthorized: true,
+            perMessageDeflate: {
+                threshold: 1024,
+            },
+            transportOptions: {},
+            closeOnBeforeunload: false,
+        }, opts);
+        this.opts.path =
+            this.opts.path.replace(/\/$/, "") +
+                (this.opts.addTrailingSlash ? "/" : "");
+        if (typeof this.opts.query === "string") {
+            this.opts.query = decode(this.opts.query);
+        }
+        if (withEventListeners) {
+            if (this.opts.closeOnBeforeunload) {
+                // Firefox closes the connection when the "beforeunload" event is emitted but not Chrome. This event listener
+                // ensures every browser behaves the same (no "disconnect" event at the Socket.IO level when the page is
+                // closed/reloaded)
+                this._beforeunloadEventListener = () => {
+                    if (this.transport) {
+                        // silently close the transport
+                        this.transport.removeAllListeners();
+                        this.transport.close();
+                    }
+                };
+                addEventListener("beforeunload", this._beforeunloadEventListener, false);
+            }
+            if (this.hostname !== "localhost") {
+                this._offlineEventListener = () => {
+                    this._onClose("transport close", {
+                        description: "network connection lost",
+                    });
+                };
+                OFFLINE_EVENT_LISTENERS.push(this._offlineEventListener);
+            }
+        }
+        if (this.opts.withCredentials) {
+            this._cookieJar = createCookieJar();
+        }
+        this._open();
+    }
+    /**
+     * Creates transport of the given type.
+     *
+     * @param {String} name - transport name
+     * @return {Transport}
+     * @private
+     */
+    createTransport(name) {
+        const query = Object.assign({}, this.opts.query);
+        // append engine.io protocol identifier
+        query.EIO = protocol$1;
+        // transport name
+        query.transport = name;
+        // session id if we already have one
+        if (this.id)
+            query.sid = this.id;
+        const opts = Object.assign({}, this.opts, {
+            query,
+            socket: this,
+            hostname: this.hostname,
+            secure: this.secure,
+            port: this.port,
+        }, this.opts.transportOptions[name]);
+        return new this._transportsByName[name](opts);
+    }
+    /**
+     * Initializes transport to use and starts probe.
+     *
+     * @private
+     */
+    _open() {
+        if (this.transports.length === 0) {
+            // Emit error on next tick so it can be listened to
+            this.setTimeoutFn(() => {
+                this.emitReserved("error", "No transports available");
+            }, 0);
+            return;
+        }
+        const transportName = this.opts.rememberUpgrade &&
+            SocketWithoutUpgrade.priorWebsocketSuccess &&
+            this.transports.indexOf("websocket") !== -1
+            ? "websocket"
+            : this.transports[0];
+        this.readyState = "opening";
+        const transport = this.createTransport(transportName);
+        transport.open();
+        this.setTransport(transport);
+    }
+    /**
+     * Sets the current transport. Disables the existing one (if any).
+     *
+     * @private
+     */
+    setTransport(transport) {
+        if (this.transport) {
+            this.transport.removeAllListeners();
+        }
+        // set up transport
+        this.transport = transport;
+        // set up transport listeners
+        transport
+            .on("drain", this._onDrain.bind(this))
+            .on("packet", this._onPacket.bind(this))
+            .on("error", this._onError.bind(this))
+            .on("close", (reason) => this._onClose("transport close", reason));
+    }
+    /**
+     * Called when connection is deemed open.
+     *
+     * @private
+     */
+    onOpen() {
+        this.readyState = "open";
+        SocketWithoutUpgrade.priorWebsocketSuccess =
+            "websocket" === this.transport.name;
+        this.emitReserved("open");
+        this.flush();
+    }
+    /**
+     * Handles a packet.
+     *
+     * @private
+     */
+    _onPacket(packet) {
+        if ("opening" === this.readyState ||
+            "open" === this.readyState ||
+            "closing" === this.readyState) {
+            this.emitReserved("packet", packet);
+            // Socket is live - any packet counts
+            this.emitReserved("heartbeat");
+            switch (packet.type) {
+                case "open":
+                    this.onHandshake(JSON.parse(packet.data));
+                    break;
+                case "ping":
+                    this._sendPacket("pong");
+                    this.emitReserved("ping");
+                    this.emitReserved("pong");
+                    this._resetPingTimeout();
+                    break;
+                case "error":
+                    const err = new Error("server error");
+                    // @ts-ignore
+                    err.code = packet.data;
+                    this._onError(err);
+                    break;
+                case "message":
+                    this.emitReserved("data", packet.data);
+                    this.emitReserved("message", packet.data);
+                    break;
+            }
+        }
+    }
+    /**
+     * Called upon handshake completion.
+     *
+     * @param {Object} data - handshake obj
+     * @private
+     */
+    onHandshake(data) {
+        this.emitReserved("handshake", data);
+        this.id = data.sid;
+        this.transport.query.sid = data.sid;
+        this._pingInterval = data.pingInterval;
+        this._pingTimeout = data.pingTimeout;
+        this._maxPayload = data.maxPayload;
+        this.onOpen();
+        // In case open handler closes socket
+        if ("closed" === this.readyState)
+            return;
+        this._resetPingTimeout();
+    }
+    /**
+     * Sets and resets ping timeout timer based on server pings.
+     *
+     * @private
+     */
+    _resetPingTimeout() {
+        this.clearTimeoutFn(this._pingTimeoutTimer);
+        const delay = this._pingInterval + this._pingTimeout;
+        this._pingTimeoutTime = Date.now() + delay;
+        this._pingTimeoutTimer = this.setTimeoutFn(() => {
+            this._onClose("ping timeout");
+        }, delay);
+        if (this.opts.autoUnref) {
+            this._pingTimeoutTimer.unref();
+        }
+    }
+    /**
+     * Called on `drain` event
+     *
+     * @private
+     */
+    _onDrain() {
+        this.writeBuffer.splice(0, this._prevBufferLen);
+        // setting prevBufferLen = 0 is very important
+        // for example, when upgrading, upgrade packet is sent over,
+        // and a nonzero prevBufferLen could cause problems on `drain`
+        this._prevBufferLen = 0;
+        if (0 === this.writeBuffer.length) {
+            this.emitReserved("drain");
+        }
+        else {
+            this.flush();
+        }
+    }
+    /**
+     * Flush write buffers.
+     *
+     * @private
+     */
+    flush() {
+        if ("closed" !== this.readyState &&
+            this.transport.writable &&
+            !this.upgrading &&
+            this.writeBuffer.length) {
+            const packets = this._getWritablePackets();
+            this.transport.send(packets);
+            // keep track of current length of writeBuffer
+            // splice writeBuffer and callbackBuffer on `drain`
+            this._prevBufferLen = packets.length;
+            this.emitReserved("flush");
+        }
+    }
+    /**
+     * Ensure the encoded size of the writeBuffer is below the maxPayload value sent by the server (only for HTTP
+     * long-polling)
+     *
+     * @private
+     */
+    _getWritablePackets() {
+        const shouldCheckPayloadSize = this._maxPayload &&
+            this.transport.name === "polling" &&
+            this.writeBuffer.length > 1;
+        if (!shouldCheckPayloadSize) {
+            return this.writeBuffer;
+        }
+        let payloadSize = 1; // first packet type
+        for (let i = 0; i < this.writeBuffer.length; i++) {
+            const data = this.writeBuffer[i].data;
+            if (data) {
+                payloadSize += byteLength(data);
+            }
+            if (i > 0 && payloadSize > this._maxPayload) {
+                return this.writeBuffer.slice(0, i);
+            }
+            payloadSize += 2; // separator + packet type
+        }
+        return this.writeBuffer;
+    }
+    /**
+     * Checks whether the heartbeat timer has expired but the socket has not yet been notified.
+     *
+     * Note: this method is private for now because it does not really fit the WebSocket API, but if we put it in the
+     * `write()` method then the message would not be buffered by the Socket.IO client.
+     *
+     * @return {boolean}
+     * @private
+     */
+    /* private */ _hasPingExpired() {
+        if (!this._pingTimeoutTime)
+            return true;
+        const hasExpired = Date.now() > this._pingTimeoutTime;
+        if (hasExpired) {
+            this._pingTimeoutTime = 0;
+            nextTick(() => {
+                this._onClose("ping timeout");
+            }, this.setTimeoutFn);
+        }
+        return hasExpired;
+    }
+    /**
+     * Sends a message.
+     *
+     * @param {String} msg - message.
+     * @param {Object} options.
+     * @param {Function} fn - callback function.
+     * @return {Socket} for chaining.
+     */
+    write(msg, options, fn) {
+        this._sendPacket("message", msg, options, fn);
+        return this;
+    }
+    /**
+     * Sends a message. Alias of {@link Socket#write}.
+     *
+     * @param {String} msg - message.
+     * @param {Object} options.
+     * @param {Function} fn - callback function.
+     * @return {Socket} for chaining.
+     */
+    send(msg, options, fn) {
+        this._sendPacket("message", msg, options, fn);
+        return this;
+    }
+    /**
+     * Sends a packet.
+     *
+     * @param {String} type: packet type.
+     * @param {String} data.
+     * @param {Object} options.
+     * @param {Function} fn - callback function.
+     * @private
+     */
+    _sendPacket(type, data, options, fn) {
+        if ("function" === typeof data) {
+            fn = data;
+            data = undefined;
+        }
+        if ("function" === typeof options) {
+            fn = options;
+            options = null;
+        }
+        if ("closing" === this.readyState || "closed" === this.readyState) {
+            return;
+        }
+        options = options || {};
+        options.compress = false !== options.compress;
+        const packet = {
+            type: type,
+            data: data,
+            options: options,
+        };
+        this.emitReserved("packetCreate", packet);
+        this.writeBuffer.push(packet);
+        if (fn)
+            this.once("flush", fn);
+        this.flush();
+    }
+    /**
+     * Closes the connection.
+     */
+    close() {
+        const close = () => {
+            this._onClose("forced close");
+            this.transport.close();
+        };
+        const cleanupAndClose = () => {
+            this.off("upgrade", cleanupAndClose);
+            this.off("upgradeError", cleanupAndClose);
+            close();
+        };
+        const waitForUpgrade = () => {
+            // wait for upgrade to finish since we can't send packets while pausing a transport
+            this.once("upgrade", cleanupAndClose);
+            this.once("upgradeError", cleanupAndClose);
+        };
+        if ("opening" === this.readyState || "open" === this.readyState) {
+            this.readyState = "closing";
+            if (this.writeBuffer.length) {
+                this.once("drain", () => {
+                    if (this.upgrading) {
+                        waitForUpgrade();
+                    }
+                    else {
+                        close();
+                    }
+                });
+            }
+            else if (this.upgrading) {
+                waitForUpgrade();
+            }
+            else {
+                close();
+            }
+        }
+        return this;
+    }
+    /**
+     * Called upon transport error
+     *
+     * @private
+     */
+    _onError(err) {
+        SocketWithoutUpgrade.priorWebsocketSuccess = false;
+        if (this.opts.tryAllTransports &&
+            this.transports.length > 1 &&
+            this.readyState === "opening") {
+            this.transports.shift();
+            return this._open();
+        }
+        this.emitReserved("error", err);
+        this._onClose("transport error", err);
+    }
+    /**
+     * Called upon transport close.
+     *
+     * @private
+     */
+    _onClose(reason, description) {
+        if ("opening" === this.readyState ||
+            "open" === this.readyState ||
+            "closing" === this.readyState) {
+            // clear timers
+            this.clearTimeoutFn(this._pingTimeoutTimer);
+            // stop event from firing again for transport
+            this.transport.removeAllListeners("close");
+            // ensure transport won't stay open
+            this.transport.close();
+            // ignore further transport communication
+            this.transport.removeAllListeners();
+            if (withEventListeners) {
+                if (this._beforeunloadEventListener) {
+                    removeEventListener("beforeunload", this._beforeunloadEventListener, false);
+                }
+                if (this._offlineEventListener) {
+                    const i = OFFLINE_EVENT_LISTENERS.indexOf(this._offlineEventListener);
+                    if (i !== -1) {
+                        OFFLINE_EVENT_LISTENERS.splice(i, 1);
+                    }
+                }
+            }
+            // set ready state
+            this.readyState = "closed";
+            // clear session id
+            this.id = null;
+            // emit close event
+            this.emitReserved("close", reason, description);
+            // clean buffers after, so users can still
+            // grab the buffers on `close` event
+            this.writeBuffer = [];
+            this._prevBufferLen = 0;
+        }
+    }
+}
+SocketWithoutUpgrade.protocol = protocol$1;
+/**
+ * This class provides a WebSocket-like interface to connect to an Engine.IO server. The connection will be established
+ * with one of the available low-level transports, like HTTP long-polling, WebSocket or WebTransport.
+ *
+ * This class comes with an upgrade mechanism, which means that once the connection is established with the first
+ * low-level transport, it will try to upgrade to a better transport.
+ *
+ * In order to allow tree-shaking, there are no transports included, that's why the `transports` option is mandatory.
+ *
+ * @example
+ * import { SocketWithUpgrade, WebSocket } from "engine.io-client";
+ *
+ * const socket = new SocketWithUpgrade({
+ *   transports: [WebSocket]
+ * });
+ *
+ * socket.on("open", () => {
+ *   socket.send("hello");
+ * });
+ *
+ * @see SocketWithoutUpgrade
+ * @see Socket
+ */
+class SocketWithUpgrade extends SocketWithoutUpgrade {
+    constructor() {
+        super(...arguments);
+        this._upgrades = [];
+    }
+    onOpen() {
+        super.onOpen();
+        if ("open" === this.readyState && this.opts.upgrade) {
+            for (let i = 0; i < this._upgrades.length; i++) {
+                this._probe(this._upgrades[i]);
+            }
+        }
+    }
+    /**
+     * Probes a transport.
+     *
+     * @param {String} name - transport name
+     * @private
+     */
+    _probe(name) {
+        let transport = this.createTransport(name);
+        let failed = false;
+        SocketWithoutUpgrade.priorWebsocketSuccess = false;
+        const onTransportOpen = () => {
+            if (failed)
+                return;
+            transport.send([{ type: "ping", data: "probe" }]);
+            transport.once("packet", (msg) => {
+                if (failed)
+                    return;
+                if ("pong" === msg.type && "probe" === msg.data) {
+                    this.upgrading = true;
+                    this.emitReserved("upgrading", transport);
+                    if (!transport)
+                        return;
+                    SocketWithoutUpgrade.priorWebsocketSuccess =
+                        "websocket" === transport.name;
+                    this.transport.pause(() => {
+                        if (failed)
+                            return;
+                        if ("closed" === this.readyState)
+                            return;
+                        cleanup();
+                        this.setTransport(transport);
+                        transport.send([{ type: "upgrade" }]);
+                        this.emitReserved("upgrade", transport);
+                        transport = null;
+                        this.upgrading = false;
+                        this.flush();
+                    });
+                }
+                else {
+                    const err = new Error("probe error");
+                    // @ts-ignore
+                    err.transport = transport.name;
+                    this.emitReserved("upgradeError", err);
+                }
+            });
+        };
+        function freezeTransport() {
+            if (failed)
+                return;
+            // Any callback called by transport should be ignored since now
+            failed = true;
+            cleanup();
+            transport.close();
+            transport = null;
+        }
+        // Handle any error that happens while probing
+        const onerror = (err) => {
+            const error = new Error("probe error: " + err);
+            // @ts-ignore
+            error.transport = transport.name;
+            freezeTransport();
+            this.emitReserved("upgradeError", error);
+        };
+        function onTransportClose() {
+            onerror("transport closed");
+        }
+        // When the socket is closed while we're probing
+        function onclose() {
+            onerror("socket closed");
+        }
+        // When the socket is upgraded while we're probing
+        function onupgrade(to) {
+            if (transport && to.name !== transport.name) {
+                freezeTransport();
+            }
+        }
+        // Remove all listeners on the transport and on self
+        const cleanup = () => {
+            transport.removeListener("open", onTransportOpen);
+            transport.removeListener("error", onerror);
+            transport.removeListener("close", onTransportClose);
+            this.off("close", onclose);
+            this.off("upgrading", onupgrade);
+        };
+        transport.once("open", onTransportOpen);
+        transport.once("error", onerror);
+        transport.once("close", onTransportClose);
+        this.once("close", onclose);
+        this.once("upgrading", onupgrade);
+        if (this._upgrades.indexOf("webtransport") !== -1 &&
+            name !== "webtransport") {
+            // favor WebTransport
+            this.setTimeoutFn(() => {
+                if (!failed) {
+                    transport.open();
+                }
+            }, 200);
+        }
+        else {
+            transport.open();
+        }
+    }
+    onHandshake(data) {
+        this._upgrades = this._filterUpgrades(data.upgrades);
+        super.onHandshake(data);
+    }
+    /**
+     * Filters upgrades, returning only those matching client transports.
+     *
+     * @param {Array} upgrades - server upgrades
+     * @private
+     */
+    _filterUpgrades(upgrades) {
+        const filteredUpgrades = [];
+        for (let i = 0; i < upgrades.length; i++) {
+            if (~this.transports.indexOf(upgrades[i]))
+                filteredUpgrades.push(upgrades[i]);
+        }
+        return filteredUpgrades;
+    }
+}
+/**
+ * This class provides a WebSocket-like interface to connect to an Engine.IO server. The connection will be established
+ * with one of the available low-level transports, like HTTP long-polling, WebSocket or WebTransport.
+ *
+ * This class comes with an upgrade mechanism, which means that once the connection is established with the first
+ * low-level transport, it will try to upgrade to a better transport.
+ *
+ * @example
+ * import { Socket } from "engine.io-client";
+ *
+ * const socket = new Socket();
+ *
+ * socket.on("open", () => {
+ *   socket.send("hello");
+ * });
+ *
+ * @see SocketWithoutUpgrade
+ * @see SocketWithUpgrade
+ */
+let Socket$1 = class Socket extends SocketWithUpgrade {
+    constructor(uri, opts = {}) {
+        const o = typeof uri === "object" ? uri : opts;
+        if (!o.transports ||
+            (o.transports && typeof o.transports[0] === "string")) {
+            o.transports = (o.transports || ["polling", "websocket", "webtransport"])
+                .map((transportName) => transports[transportName])
+                .filter((t) => !!t);
+        }
+        super(uri, o);
+    }
+};
+
+/**
+ * URL parser.
+ *
+ * @param uri - url
+ * @param path - the request path of the connection
+ * @param loc - An object meant to mimic window.location.
+ *        Defaults to window.location.
+ * @public
+ */
+function url(uri, path = "", loc) {
+    let obj = uri;
+    // default to window.location
+    loc = loc || (typeof location !== "undefined" && location);
+    if (null == uri)
+        uri = loc.protocol + "//" + loc.host;
+    // relative path support
+    if (typeof uri === "string") {
+        if ("/" === uri.charAt(0)) {
+            if ("/" === uri.charAt(1)) {
+                uri = loc.protocol + uri;
+            }
+            else {
+                uri = loc.host + uri;
+            }
+        }
+        if (!/^(https?|wss?):\/\//.test(uri)) {
+            if ("undefined" !== typeof loc) {
+                uri = loc.protocol + "//" + uri;
+            }
+            else {
+                uri = "https://" + uri;
+            }
+        }
+        // parse
+        obj = parse$4(uri);
+    }
+    // make sure we treat `localhost:80` and `localhost` equally
+    if (!obj.port) {
+        if (/^(http|ws)$/.test(obj.protocol)) {
+            obj.port = "80";
+        }
+        else if (/^(http|ws)s$/.test(obj.protocol)) {
+            obj.port = "443";
+        }
+    }
+    obj.path = obj.path || "/";
+    const ipv6 = obj.host.indexOf(":") !== -1;
+    const host = ipv6 ? "[" + obj.host + "]" : obj.host;
+    // define unique id
+    obj.id = obj.protocol + "://" + host + ":" + obj.port + path;
+    // define href
+    obj.href =
+        obj.protocol +
+            "://" +
+            host +
+            (loc && loc.port === obj.port ? "" : ":" + obj.port);
+    return obj;
+}
+
+const withNativeArrayBuffer = typeof ArrayBuffer === "function";
+const isView = (obj) => {
+    return typeof ArrayBuffer.isView === "function"
+        ? ArrayBuffer.isView(obj)
+        : obj.buffer instanceof ArrayBuffer;
+};
+const toString$2 = Object.prototype.toString;
+const withNativeBlob = typeof Blob === "function" ||
+    (typeof Blob !== "undefined" &&
+        toString$2.call(Blob) === "[object BlobConstructor]");
+const withNativeFile = typeof File === "function" ||
+    (typeof File !== "undefined" &&
+        toString$2.call(File) === "[object FileConstructor]");
+/**
+ * Returns true if obj is a Buffer, an ArrayBuffer, a Blob or a File.
+ *
+ * @private
+ */
+function isBinary(obj) {
+    return ((withNativeArrayBuffer && (obj instanceof ArrayBuffer || isView(obj))) ||
+        (withNativeBlob && obj instanceof Blob) ||
+        (withNativeFile && obj instanceof File));
+}
+function hasBinary(obj, toJSON) {
+    if (!obj || typeof obj !== "object") {
+        return false;
+    }
+    if (Array.isArray(obj)) {
+        for (let i = 0, l = obj.length; i < l; i++) {
+            if (hasBinary(obj[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+    if (isBinary(obj)) {
+        return true;
+    }
+    if (obj.toJSON &&
+        typeof obj.toJSON === "function" &&
+        arguments.length === 1) {
+        return hasBinary(obj.toJSON(), true);
+    }
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key) && hasBinary(obj[key])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Replaces every Buffer | ArrayBuffer | Blob | File in packet with a numbered placeholder.
+ *
+ * @param {Object} packet - socket.io event packet
+ * @return {Object} with deconstructed packet and list of buffers
+ * @public
+ */
+function deconstructPacket(packet) {
+    const buffers = [];
+    const packetData = packet.data;
+    const pack = packet;
+    pack.data = _deconstructPacket(packetData, buffers);
+    pack.attachments = buffers.length; // number of binary 'attachments'
+    return { packet: pack, buffers: buffers };
+}
+function _deconstructPacket(data, buffers) {
+    if (!data)
+        return data;
+    if (isBinary(data)) {
+        const placeholder = { _placeholder: true, num: buffers.length };
+        buffers.push(data);
+        return placeholder;
+    }
+    else if (Array.isArray(data)) {
+        const newData = new Array(data.length);
+        for (let i = 0; i < data.length; i++) {
+            newData[i] = _deconstructPacket(data[i], buffers);
+        }
+        return newData;
+    }
+    else if (typeof data === "object" && !(data instanceof Date)) {
+        const newData = {};
+        for (const key in data) {
+            if (Object.prototype.hasOwnProperty.call(data, key)) {
+                newData[key] = _deconstructPacket(data[key], buffers);
+            }
+        }
+        return newData;
+    }
+    return data;
+}
+/**
+ * Reconstructs a binary packet from its placeholder packet and buffers
+ *
+ * @param {Object} packet - event packet with placeholders
+ * @param {Array} buffers - binary buffers to put in placeholder positions
+ * @return {Object} reconstructed packet
+ * @public
+ */
+function reconstructPacket(packet, buffers) {
+    packet.data = _reconstructPacket(packet.data, buffers);
+    delete packet.attachments; // no longer useful
+    return packet;
+}
+function _reconstructPacket(data, buffers) {
+    if (!data)
+        return data;
+    if (data && data._placeholder === true) {
+        const isIndexValid = typeof data.num === "number" &&
+            data.num >= 0 &&
+            data.num < buffers.length;
+        if (isIndexValid) {
+            return buffers[data.num]; // appropriate buffer (should be natural order anyway)
+        }
+        else {
+            throw new Error("illegal attachments");
+        }
+    }
+    else if (Array.isArray(data)) {
+        for (let i = 0; i < data.length; i++) {
+            data[i] = _reconstructPacket(data[i], buffers);
+        }
+    }
+    else if (typeof data === "object") {
+        for (const key in data) {
+            if (Object.prototype.hasOwnProperty.call(data, key)) {
+                data[key] = _reconstructPacket(data[key], buffers);
+            }
+        }
+    }
+    return data;
+}
+
+/**
+ * These strings must not be used as event names, as they have a special meaning.
+ */
+const RESERVED_EVENTS$1 = [
+    "connect",
+    "connect_error",
+    "disconnect",
+    "disconnecting",
+    "newListener",
+    "removeListener", // used by the Node.js EventEmitter
+];
+/**
+ * Protocol version.
+ *
+ * @public
+ */
+const protocol = 5;
+var PacketType;
+(function (PacketType) {
+    PacketType[PacketType["CONNECT"] = 0] = "CONNECT";
+    PacketType[PacketType["DISCONNECT"] = 1] = "DISCONNECT";
+    PacketType[PacketType["EVENT"] = 2] = "EVENT";
+    PacketType[PacketType["ACK"] = 3] = "ACK";
+    PacketType[PacketType["CONNECT_ERROR"] = 4] = "CONNECT_ERROR";
+    PacketType[PacketType["BINARY_EVENT"] = 5] = "BINARY_EVENT";
+    PacketType[PacketType["BINARY_ACK"] = 6] = "BINARY_ACK";
+})(PacketType || (PacketType = {}));
+/**
+ * A socket.io Encoder instance
+ */
+class Encoder {
+    /**
+     * Encoder constructor
+     *
+     * @param {function} replacer - custom replacer to pass down to JSON.parse
+     */
+    constructor(replacer) {
+        this.replacer = replacer;
+    }
+    /**
+     * Encode a packet as a single string if non-binary, or as a
+     * buffer sequence, depending on packet type.
+     *
+     * @param {Object} obj - packet object
+     */
+    encode(obj) {
+        if (obj.type === PacketType.EVENT || obj.type === PacketType.ACK) {
+            if (hasBinary(obj)) {
+                return this.encodeAsBinary({
+                    type: obj.type === PacketType.EVENT
+                        ? PacketType.BINARY_EVENT
+                        : PacketType.BINARY_ACK,
+                    nsp: obj.nsp,
+                    data: obj.data,
+                    id: obj.id,
+                });
+            }
+        }
+        return [this.encodeAsString(obj)];
+    }
+    /**
+     * Encode packet as string.
+     */
+    encodeAsString(obj) {
+        // first is type
+        let str = "" + obj.type;
+        // attachments if we have them
+        if (obj.type === PacketType.BINARY_EVENT ||
+            obj.type === PacketType.BINARY_ACK) {
+            str += obj.attachments + "-";
+        }
+        // if we have a namespace other than `/`
+        // we append it followed by a comma `,`
+        if (obj.nsp && "/" !== obj.nsp) {
+            str += obj.nsp + ",";
+        }
+        // immediately followed by the id
+        if (null != obj.id) {
+            str += obj.id;
+        }
+        // json data
+        if (null != obj.data) {
+            str += JSON.stringify(obj.data, this.replacer);
+        }
+        return str;
+    }
+    /**
+     * Encode packet as 'buffer sequence' by removing blobs, and
+     * deconstructing packet into object with placeholders and
+     * a list of buffers.
+     */
+    encodeAsBinary(obj) {
+        const deconstruction = deconstructPacket(obj);
+        const pack = this.encodeAsString(deconstruction.packet);
+        const buffers = deconstruction.buffers;
+        buffers.unshift(pack); // add packet info to beginning of data list
+        return buffers; // write all the buffers
+    }
+}
+// see https://stackoverflow.com/questions/8511281/check-if-a-value-is-an-object-in-javascript
+function isObject$1(value) {
+    return Object.prototype.toString.call(value) === "[object Object]";
+}
+/**
+ * A socket.io Decoder instance
+ *
+ * @return {Object} decoder
+ */
+class Decoder extends Emitter {
+    /**
+     * Decoder constructor
+     *
+     * @param {function} reviver - custom reviver to pass down to JSON.stringify
+     */
+    constructor(reviver) {
+        super();
+        this.reviver = reviver;
+    }
+    /**
+     * Decodes an encoded packet string into packet JSON.
+     *
+     * @param {String} obj - encoded packet
+     */
+    add(obj) {
+        let packet;
+        if (typeof obj === "string") {
+            if (this.reconstructor) {
+                throw new Error("got plaintext data when reconstructing a packet");
+            }
+            packet = this.decodeString(obj);
+            const isBinaryEvent = packet.type === PacketType.BINARY_EVENT;
+            if (isBinaryEvent || packet.type === PacketType.BINARY_ACK) {
+                packet.type = isBinaryEvent ? PacketType.EVENT : PacketType.ACK;
+                // binary packet's json
+                this.reconstructor = new BinaryReconstructor(packet);
+                // no attachments, labeled binary but no binary data to follow
+                if (packet.attachments === 0) {
+                    super.emitReserved("decoded", packet);
+                }
+            }
+            else {
+                // non-binary full packet
+                super.emitReserved("decoded", packet);
+            }
+        }
+        else if (isBinary(obj) || obj.base64) {
+            // raw binary data
+            if (!this.reconstructor) {
+                throw new Error("got binary data when not reconstructing a packet");
+            }
+            else {
+                packet = this.reconstructor.takeBinaryData(obj);
+                if (packet) {
+                    // received final buffer
+                    this.reconstructor = null;
+                    super.emitReserved("decoded", packet);
+                }
+            }
+        }
+        else {
+            throw new Error("Unknown type: " + obj);
+        }
+    }
+    /**
+     * Decode a packet String (JSON data)
+     *
+     * @param {String} str
+     * @return {Object} packet
+     */
+    decodeString(str) {
+        let i = 0;
+        // look up type
+        const p = {
+            type: Number(str.charAt(0)),
+        };
+        if (PacketType[p.type] === undefined) {
+            throw new Error("unknown packet type " + p.type);
+        }
+        // look up attachments if type binary
+        if (p.type === PacketType.BINARY_EVENT ||
+            p.type === PacketType.BINARY_ACK) {
+            const start = i + 1;
+            while (str.charAt(++i) !== "-" && i != str.length) { }
+            const buf = str.substring(start, i);
+            if (buf != Number(buf) || str.charAt(i) !== "-") {
+                throw new Error("Illegal attachments");
+            }
+            p.attachments = Number(buf);
+        }
+        // look up namespace (if any)
+        if ("/" === str.charAt(i + 1)) {
+            const start = i + 1;
+            while (++i) {
+                const c = str.charAt(i);
+                if ("," === c)
+                    break;
+                if (i === str.length)
+                    break;
+            }
+            p.nsp = str.substring(start, i);
+        }
+        else {
+            p.nsp = "/";
+        }
+        // look up id
+        const next = str.charAt(i + 1);
+        if ("" !== next && Number(next) == next) {
+            const start = i + 1;
+            while (++i) {
+                const c = str.charAt(i);
+                if (null == c || Number(c) != c) {
+                    --i;
+                    break;
+                }
+                if (i === str.length)
+                    break;
+            }
+            p.id = Number(str.substring(start, i + 1));
+        }
+        // look up json data
+        if (str.charAt(++i)) {
+            const payload = this.tryParse(str.substr(i));
+            if (Decoder.isPayloadValid(p.type, payload)) {
+                p.data = payload;
+            }
+            else {
+                throw new Error("invalid payload");
+            }
+        }
+        return p;
+    }
+    tryParse(str) {
+        try {
+            return JSON.parse(str, this.reviver);
+        }
+        catch (e) {
+            return false;
+        }
+    }
+    static isPayloadValid(type, payload) {
+        switch (type) {
+            case PacketType.CONNECT:
+                return isObject$1(payload);
+            case PacketType.DISCONNECT:
+                return payload === undefined;
+            case PacketType.CONNECT_ERROR:
+                return typeof payload === "string" || isObject$1(payload);
+            case PacketType.EVENT:
+            case PacketType.BINARY_EVENT:
+                return (Array.isArray(payload) &&
+                    (typeof payload[0] === "number" ||
+                        (typeof payload[0] === "string" &&
+                            RESERVED_EVENTS$1.indexOf(payload[0]) === -1)));
+            case PacketType.ACK:
+            case PacketType.BINARY_ACK:
+                return Array.isArray(payload);
+        }
+    }
+    /**
+     * Deallocates a parser's resources
+     */
+    destroy() {
+        if (this.reconstructor) {
+            this.reconstructor.finishedReconstruction();
+            this.reconstructor = null;
+        }
+    }
+}
+/**
+ * A manager of a binary event's 'buffer sequence'. Should
+ * be constructed whenever a packet of type BINARY_EVENT is
+ * decoded.
+ *
+ * @param {Object} packet
+ * @return {BinaryReconstructor} initialized reconstructor
+ */
+class BinaryReconstructor {
+    constructor(packet) {
+        this.packet = packet;
+        this.buffers = [];
+        this.reconPack = packet;
+    }
+    /**
+     * Method to be called when binary data received from connection
+     * after a BINARY_EVENT packet.
+     *
+     * @param {Buffer | ArrayBuffer} binData - the raw binary data received
+     * @return {null | Object} returns null if more binary data is expected or
+     *   a reconstructed packet object if all buffers have been received.
+     */
+    takeBinaryData(binData) {
+        this.buffers.push(binData);
+        if (this.buffers.length === this.reconPack.attachments) {
+            // done with buffer list
+            const packet = reconstructPacket(this.reconPack, this.buffers);
+            this.finishedReconstruction();
+            return packet;
+        }
+        return null;
+    }
+    /**
+     * Cleans up binary packet reconstruction variables.
+     */
+    finishedReconstruction() {
+        this.reconPack = null;
+        this.buffers = [];
+    }
+}
+
+const parser$2 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  Decoder,
+  Encoder,
+  get PacketType () { return PacketType; },
+  protocol
+}, Symbol.toStringTag, { value: 'Module' }));
+
+function on(obj, ev, fn) {
+    obj.on(ev, fn);
+    return function subDestroy() {
+        obj.off(ev, fn);
+    };
+}
+
+/**
+ * Internal events.
+ * These events can't be emitted by the user.
+ */
+const RESERVED_EVENTS = Object.freeze({
+    connect: 1,
+    connect_error: 1,
+    disconnect: 1,
+    disconnecting: 1,
+    // EventEmitter reserved events: https://nodejs.org/api/events.html#events_event_newlistener
+    newListener: 1,
+    removeListener: 1,
+});
+/**
+ * A Socket is the fundamental class for interacting with the server.
+ *
+ * A Socket belongs to a certain Namespace (by default /) and uses an underlying {@link Manager} to communicate.
+ *
+ * @example
+ * const socket = io();
+ *
+ * socket.on("connect", () => {
+ *   console.log("connected");
+ * });
+ *
+ * // send an event to the server
+ * socket.emit("foo", "bar");
+ *
+ * socket.on("foobar", () => {
+ *   // an event was received from the server
+ * });
+ *
+ * // upon disconnection
+ * socket.on("disconnect", (reason) => {
+ *   console.log(`disconnected due to ${reason}`);
+ * });
+ */
+class Socket extends Emitter {
+    /**
+     * `Socket` constructor.
+     */
+    constructor(io, nsp, opts) {
+        super();
+        /**
+         * Whether the socket is currently connected to the server.
+         *
+         * @example
+         * const socket = io();
+         *
+         * socket.on("connect", () => {
+         *   console.log(socket.connected); // true
+         * });
+         *
+         * socket.on("disconnect", () => {
+         *   console.log(socket.connected); // false
+         * });
+         */
+        this.connected = false;
+        /**
+         * Whether the connection state was recovered after a temporary disconnection. In that case, any missed packets will
+         * be transmitted by the server.
+         */
+        this.recovered = false;
+        /**
+         * Buffer for packets received before the CONNECT packet
+         */
+        this.receiveBuffer = [];
+        /**
+         * Buffer for packets that will be sent once the socket is connected
+         */
+        this.sendBuffer = [];
+        /**
+         * The queue of packets to be sent with retry in case of failure.
+         *
+         * Packets are sent one by one, each waiting for the server acknowledgement, in order to guarantee the delivery order.
+         * @private
+         */
+        this._queue = [];
+        /**
+         * A sequence to generate the ID of the {@link QueuedPacket}.
+         * @private
+         */
+        this._queueSeq = 0;
+        this.ids = 0;
+        /**
+         * A map containing acknowledgement handlers.
+         *
+         * The `withError` attribute is used to differentiate handlers that accept an error as first argument:
+         *
+         * - `socket.emit("test", (err, value) => { ... })` with `ackTimeout` option
+         * - `socket.timeout(5000).emit("test", (err, value) => { ... })`
+         * - `const value = await socket.emitWithAck("test")`
+         *
+         * From those that don't:
+         *
+         * - `socket.emit("test", (value) => { ... });`
+         *
+         * In the first case, the handlers will be called with an error when:
+         *
+         * - the timeout is reached
+         * - the socket gets disconnected
+         *
+         * In the second case, the handlers will be simply discarded upon disconnection, since the client will never receive
+         * an acknowledgement from the server.
+         *
+         * @private
+         */
+        this.acks = {};
+        this.flags = {};
+        this.io = io;
+        this.nsp = nsp;
+        if (opts && opts.auth) {
+            this.auth = opts.auth;
+        }
+        this._opts = Object.assign({}, opts);
+        if (this.io._autoConnect)
+            this.open();
+    }
+    /**
+     * Whether the socket is currently disconnected
+     *
+     * @example
+     * const socket = io();
+     *
+     * socket.on("connect", () => {
+     *   console.log(socket.disconnected); // false
+     * });
+     *
+     * socket.on("disconnect", () => {
+     *   console.log(socket.disconnected); // true
+     * });
+     */
+    get disconnected() {
+        return !this.connected;
+    }
+    /**
+     * Subscribe to open, close and packet events
+     *
+     * @private
+     */
+    subEvents() {
+        if (this.subs)
+            return;
+        const io = this.io;
+        this.subs = [
+            on(io, "open", this.onopen.bind(this)),
+            on(io, "packet", this.onpacket.bind(this)),
+            on(io, "error", this.onerror.bind(this)),
+            on(io, "close", this.onclose.bind(this)),
+        ];
+    }
+    /**
+     * Whether the Socket will try to reconnect when its Manager connects or reconnects.
+     *
+     * @example
+     * const socket = io();
+     *
+     * console.log(socket.active); // true
+     *
+     * socket.on("disconnect", (reason) => {
+     *   if (reason === "io server disconnect") {
+     *     // the disconnection was initiated by the server, you need to manually reconnect
+     *     console.log(socket.active); // false
+     *   }
+     *   // else the socket will automatically try to reconnect
+     *   console.log(socket.active); // true
+     * });
+     */
+    get active() {
+        return !!this.subs;
+    }
+    /**
+     * "Opens" the socket.
+     *
+     * @example
+     * const socket = io({
+     *   autoConnect: false
+     * });
+     *
+     * socket.connect();
+     */
+    connect() {
+        if (this.connected)
+            return this;
+        this.subEvents();
+        if (!this.io["_reconnecting"])
+            this.io.open(); // ensure open
+        if ("open" === this.io._readyState)
+            this.onopen();
+        return this;
+    }
+    /**
+     * Alias for {@link connect()}.
+     */
+    open() {
+        return this.connect();
+    }
+    /**
+     * Sends a `message` event.
+     *
+     * This method mimics the WebSocket.send() method.
+     *
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/send
+     *
+     * @example
+     * socket.send("hello");
+     *
+     * // this is equivalent to
+     * socket.emit("message", "hello");
+     *
+     * @return self
+     */
+    send(...args) {
+        args.unshift("message");
+        this.emit.apply(this, args);
+        return this;
+    }
+    /**
+     * Override `emit`.
+     * If the event is in `events`, it's emitted normally.
+     *
+     * @example
+     * socket.emit("hello", "world");
+     *
+     * // all serializable datastructures are supported (no need to call JSON.stringify)
+     * socket.emit("hello", 1, "2", { 3: ["4"], 5: Uint8Array.from([6]) });
+     *
+     * // with an acknowledgement from the server
+     * socket.emit("hello", "world", (val) => {
+     *   // ...
+     * });
+     *
+     * @return self
+     */
+    emit(ev, ...args) {
+        var _a, _b, _c;
+        if (RESERVED_EVENTS.hasOwnProperty(ev)) {
+            throw new Error('"' + ev.toString() + '" is a reserved event name');
+        }
+        args.unshift(ev);
+        if (this._opts.retries && !this.flags.fromQueue && !this.flags.volatile) {
+            this._addToQueue(args);
+            return this;
+        }
+        const packet = {
+            type: PacketType.EVENT,
+            data: args,
+        };
+        packet.options = {};
+        packet.options.compress = this.flags.compress !== false;
+        // event ack callback
+        if ("function" === typeof args[args.length - 1]) {
+            const id = this.ids++;
+            const ack = args.pop();
+            this._registerAckCallback(id, ack);
+            packet.id = id;
+        }
+        const isTransportWritable = (_b = (_a = this.io.engine) === null || _a === void 0 ? void 0 : _a.transport) === null || _b === void 0 ? void 0 : _b.writable;
+        const isConnected = this.connected && !((_c = this.io.engine) === null || _c === void 0 ? void 0 : _c._hasPingExpired());
+        const discardPacket = this.flags.volatile && !isTransportWritable;
+        if (discardPacket) ;
+        else if (isConnected) {
+            this.notifyOutgoingListeners(packet);
+            this.packet(packet);
+        }
+        else {
+            this.sendBuffer.push(packet);
+        }
+        this.flags = {};
+        return this;
+    }
+    /**
+     * @private
+     */
+    _registerAckCallback(id, ack) {
+        var _a;
+        const timeout = (_a = this.flags.timeout) !== null && _a !== void 0 ? _a : this._opts.ackTimeout;
+        if (timeout === undefined) {
+            this.acks[id] = ack;
+            return;
+        }
+        // @ts-ignore
+        const timer = this.io.setTimeoutFn(() => {
+            delete this.acks[id];
+            for (let i = 0; i < this.sendBuffer.length; i++) {
+                if (this.sendBuffer[i].id === id) {
+                    this.sendBuffer.splice(i, 1);
+                }
+            }
+            ack.call(this, new Error("operation has timed out"));
+        }, timeout);
+        const fn = (...args) => {
+            // @ts-ignore
+            this.io.clearTimeoutFn(timer);
+            ack.apply(this, args);
+        };
+        fn.withError = true;
+        this.acks[id] = fn;
+    }
+    /**
+     * Emits an event and waits for an acknowledgement
+     *
+     * @example
+     * // without timeout
+     * const response = await socket.emitWithAck("hello", "world");
+     *
+     * // with a specific timeout
+     * try {
+     *   const response = await socket.timeout(1000).emitWithAck("hello", "world");
+     * } catch (err) {
+     *   // the server did not acknowledge the event in the given delay
+     * }
+     *
+     * @return a Promise that will be fulfilled when the server acknowledges the event
+     */
+    emitWithAck(ev, ...args) {
+        return new Promise((resolve, reject) => {
+            const fn = (arg1, arg2) => {
+                return arg1 ? reject(arg1) : resolve(arg2);
+            };
+            fn.withError = true;
+            args.push(fn);
+            this.emit(ev, ...args);
+        });
+    }
+    /**
+     * Add the packet to the queue.
+     * @param args
+     * @private
+     */
+    _addToQueue(args) {
+        let ack;
+        if (typeof args[args.length - 1] === "function") {
+            ack = args.pop();
+        }
+        const packet = {
+            id: this._queueSeq++,
+            tryCount: 0,
+            pending: false,
+            args,
+            flags: Object.assign({ fromQueue: true }, this.flags),
+        };
+        args.push((err, ...responseArgs) => {
+            if (packet !== this._queue[0]) {
+                // the packet has already been acknowledged
+                return;
+            }
+            const hasError = err !== null;
+            if (hasError) {
+                if (packet.tryCount > this._opts.retries) {
+                    this._queue.shift();
+                    if (ack) {
+                        ack(err);
+                    }
+                }
+            }
+            else {
+                this._queue.shift();
+                if (ack) {
+                    ack(null, ...responseArgs);
+                }
+            }
+            packet.pending = false;
+            return this._drainQueue();
+        });
+        this._queue.push(packet);
+        this._drainQueue();
+    }
+    /**
+     * Send the first packet of the queue, and wait for an acknowledgement from the server.
+     * @param force - whether to resend a packet that has not been acknowledged yet
+     *
+     * @private
+     */
+    _drainQueue(force = false) {
+        if (!this.connected || this._queue.length === 0) {
+            return;
+        }
+        const packet = this._queue[0];
+        if (packet.pending && !force) {
+            return;
+        }
+        packet.pending = true;
+        packet.tryCount++;
+        this.flags = packet.flags;
+        this.emit.apply(this, packet.args);
+    }
+    /**
+     * Sends a packet.
+     *
+     * @param packet
+     * @private
+     */
+    packet(packet) {
+        packet.nsp = this.nsp;
+        this.io._packet(packet);
+    }
+    /**
+     * Called upon engine `open`.
+     *
+     * @private
+     */
+    onopen() {
+        if (typeof this.auth == "function") {
+            this.auth((data) => {
+                this._sendConnectPacket(data);
+            });
+        }
+        else {
+            this._sendConnectPacket(this.auth);
+        }
+    }
+    /**
+     * Sends a CONNECT packet to initiate the Socket.IO session.
+     *
+     * @param data
+     * @private
+     */
+    _sendConnectPacket(data) {
+        this.packet({
+            type: PacketType.CONNECT,
+            data: this._pid
+                ? Object.assign({ pid: this._pid, offset: this._lastOffset }, data)
+                : data,
+        });
+    }
+    /**
+     * Called upon engine or manager `error`.
+     *
+     * @param err
+     * @private
+     */
+    onerror(err) {
+        if (!this.connected) {
+            this.emitReserved("connect_error", err);
+        }
+    }
+    /**
+     * Called upon engine `close`.
+     *
+     * @param reason
+     * @param description
+     * @private
+     */
+    onclose(reason, description) {
+        this.connected = false;
+        delete this.id;
+        this.emitReserved("disconnect", reason, description);
+        this._clearAcks();
+    }
+    /**
+     * Clears the acknowledgement handlers upon disconnection, since the client will never receive an acknowledgement from
+     * the server.
+     *
+     * @private
+     */
+    _clearAcks() {
+        Object.keys(this.acks).forEach((id) => {
+            const isBuffered = this.sendBuffer.some((packet) => String(packet.id) === id);
+            if (!isBuffered) {
+                // note: handlers that do not accept an error as first argument are ignored here
+                const ack = this.acks[id];
+                delete this.acks[id];
+                if (ack.withError) {
+                    ack.call(this, new Error("socket has been disconnected"));
+                }
+            }
+        });
+    }
+    /**
+     * Called with socket packet.
+     *
+     * @param packet
+     * @private
+     */
+    onpacket(packet) {
+        const sameNamespace = packet.nsp === this.nsp;
+        if (!sameNamespace)
+            return;
+        switch (packet.type) {
+            case PacketType.CONNECT:
+                if (packet.data && packet.data.sid) {
+                    this.onconnect(packet.data.sid, packet.data.pid);
+                }
+                else {
+                    this.emitReserved("connect_error", new Error("It seems you are trying to reach a Socket.IO server in v2.x with a v3.x client, but they are not compatible (more information here: https://socket.io/docs/v3/migrating-from-2-x-to-3-0/)"));
+                }
+                break;
+            case PacketType.EVENT:
+            case PacketType.BINARY_EVENT:
+                this.onevent(packet);
+                break;
+            case PacketType.ACK:
+            case PacketType.BINARY_ACK:
+                this.onack(packet);
+                break;
+            case PacketType.DISCONNECT:
+                this.ondisconnect();
+                break;
+            case PacketType.CONNECT_ERROR:
+                this.destroy();
+                const err = new Error(packet.data.message);
+                // @ts-ignore
+                err.data = packet.data.data;
+                this.emitReserved("connect_error", err);
+                break;
+        }
+    }
+    /**
+     * Called upon a server event.
+     *
+     * @param packet
+     * @private
+     */
+    onevent(packet) {
+        const args = packet.data || [];
+        if (null != packet.id) {
+            args.push(this.ack(packet.id));
+        }
+        if (this.connected) {
+            this.emitEvent(args);
+        }
+        else {
+            this.receiveBuffer.push(Object.freeze(args));
+        }
+    }
+    emitEvent(args) {
+        if (this._anyListeners && this._anyListeners.length) {
+            const listeners = this._anyListeners.slice();
+            for (const listener of listeners) {
+                listener.apply(this, args);
+            }
+        }
+        super.emit.apply(this, args);
+        if (this._pid && args.length && typeof args[args.length - 1] === "string") {
+            this._lastOffset = args[args.length - 1];
+        }
+    }
+    /**
+     * Produces an ack callback to emit with an event.
+     *
+     * @private
+     */
+    ack(id) {
+        const self = this;
+        let sent = false;
+        return function (...args) {
+            // prevent double callbacks
+            if (sent)
+                return;
+            sent = true;
+            self.packet({
+                type: PacketType.ACK,
+                id: id,
+                data: args,
+            });
+        };
+    }
+    /**
+     * Called upon a server acknowledgement.
+     *
+     * @param packet
+     * @private
+     */
+    onack(packet) {
+        const ack = this.acks[packet.id];
+        if (typeof ack !== "function") {
+            return;
+        }
+        delete this.acks[packet.id];
+        // @ts-ignore FIXME ack is incorrectly inferred as 'never'
+        if (ack.withError) {
+            packet.data.unshift(null);
+        }
+        // @ts-ignore
+        ack.apply(this, packet.data);
+    }
+    /**
+     * Called upon server connect.
+     *
+     * @private
+     */
+    onconnect(id, pid) {
+        this.id = id;
+        this.recovered = pid && this._pid === pid;
+        this._pid = pid; // defined only if connection state recovery is enabled
+        this.connected = true;
+        this.emitBuffered();
+        this.emitReserved("connect");
+        this._drainQueue(true);
+    }
+    /**
+     * Emit buffered events (received and emitted).
+     *
+     * @private
+     */
+    emitBuffered() {
+        this.receiveBuffer.forEach((args) => this.emitEvent(args));
+        this.receiveBuffer = [];
+        this.sendBuffer.forEach((packet) => {
+            this.notifyOutgoingListeners(packet);
+            this.packet(packet);
+        });
+        this.sendBuffer = [];
+    }
+    /**
+     * Called upon server disconnect.
+     *
+     * @private
+     */
+    ondisconnect() {
+        this.destroy();
+        this.onclose("io server disconnect");
+    }
+    /**
+     * Called upon forced client/server side disconnections,
+     * this method ensures the manager stops tracking us and
+     * that reconnections don't get triggered for this.
+     *
+     * @private
+     */
+    destroy() {
+        if (this.subs) {
+            // clean subscriptions to avoid reconnections
+            this.subs.forEach((subDestroy) => subDestroy());
+            this.subs = undefined;
+        }
+        this.io["_destroy"](this);
+    }
+    /**
+     * Disconnects the socket manually. In that case, the socket will not try to reconnect.
+     *
+     * If this is the last active Socket instance of the {@link Manager}, the low-level connection will be closed.
+     *
+     * @example
+     * const socket = io();
+     *
+     * socket.on("disconnect", (reason) => {
+     *   // console.log(reason); prints "io client disconnect"
+     * });
+     *
+     * socket.disconnect();
+     *
+     * @return self
+     */
+    disconnect() {
+        if (this.connected) {
+            this.packet({ type: PacketType.DISCONNECT });
+        }
+        // remove socket from pool
+        this.destroy();
+        if (this.connected) {
+            // fire events
+            this.onclose("io client disconnect");
+        }
+        return this;
+    }
+    /**
+     * Alias for {@link disconnect()}.
+     *
+     * @return self
+     */
+    close() {
+        return this.disconnect();
+    }
+    /**
+     * Sets the compress flag.
+     *
+     * @example
+     * socket.compress(false).emit("hello");
+     *
+     * @param compress - if `true`, compresses the sending data
+     * @return self
+     */
+    compress(compress) {
+        this.flags.compress = compress;
+        return this;
+    }
+    /**
+     * Sets a modifier for a subsequent event emission that the event message will be dropped when this socket is not
+     * ready to send messages.
+     *
+     * @example
+     * socket.volatile.emit("hello"); // the server may or may not receive it
+     *
+     * @returns self
+     */
+    get volatile() {
+        this.flags.volatile = true;
+        return this;
+    }
+    /**
+     * Sets a modifier for a subsequent event emission that the callback will be called with an error when the
+     * given number of milliseconds have elapsed without an acknowledgement from the server:
+     *
+     * @example
+     * socket.timeout(5000).emit("my-event", (err) => {
+     *   if (err) {
+     *     // the server did not acknowledge the event in the given delay
+     *   }
+     * });
+     *
+     * @returns self
+     */
+    timeout(timeout) {
+        this.flags.timeout = timeout;
+        return this;
+    }
+    /**
+     * Adds a listener that will be fired when any event is emitted. The event name is passed as the first argument to the
+     * callback.
+     *
+     * @example
+     * socket.onAny((event, ...args) => {
+     *   console.log(`got ${event}`);
+     * });
+     *
+     * @param listener
+     */
+    onAny(listener) {
+        this._anyListeners = this._anyListeners || [];
+        this._anyListeners.push(listener);
+        return this;
+    }
+    /**
+     * Adds a listener that will be fired when any event is emitted. The event name is passed as the first argument to the
+     * callback. The listener is added to the beginning of the listeners array.
+     *
+     * @example
+     * socket.prependAny((event, ...args) => {
+     *   console.log(`got event ${event}`);
+     * });
+     *
+     * @param listener
+     */
+    prependAny(listener) {
+        this._anyListeners = this._anyListeners || [];
+        this._anyListeners.unshift(listener);
+        return this;
+    }
+    /**
+     * Removes the listener that will be fired when any event is emitted.
+     *
+     * @example
+     * const catchAllListener = (event, ...args) => {
+     *   console.log(`got event ${event}`);
+     * }
+     *
+     * socket.onAny(catchAllListener);
+     *
+     * // remove a specific listener
+     * socket.offAny(catchAllListener);
+     *
+     * // or remove all listeners
+     * socket.offAny();
+     *
+     * @param listener
+     */
+    offAny(listener) {
+        if (!this._anyListeners) {
+            return this;
+        }
+        if (listener) {
+            const listeners = this._anyListeners;
+            for (let i = 0; i < listeners.length; i++) {
+                if (listener === listeners[i]) {
+                    listeners.splice(i, 1);
+                    return this;
+                }
+            }
+        }
+        else {
+            this._anyListeners = [];
+        }
+        return this;
+    }
+    /**
+     * Returns an array of listeners that are listening for any event that is specified. This array can be manipulated,
+     * e.g. to remove listeners.
+     */
+    listenersAny() {
+        return this._anyListeners || [];
+    }
+    /**
+     * Adds a listener that will be fired when any event is emitted. The event name is passed as the first argument to the
+     * callback.
+     *
+     * Note: acknowledgements sent to the server are not included.
+     *
+     * @example
+     * socket.onAnyOutgoing((event, ...args) => {
+     *   console.log(`sent event ${event}`);
+     * });
+     *
+     * @param listener
+     */
+    onAnyOutgoing(listener) {
+        this._anyOutgoingListeners = this._anyOutgoingListeners || [];
+        this._anyOutgoingListeners.push(listener);
+        return this;
+    }
+    /**
+     * Adds a listener that will be fired when any event is emitted. The event name is passed as the first argument to the
+     * callback. The listener is added to the beginning of the listeners array.
+     *
+     * Note: acknowledgements sent to the server are not included.
+     *
+     * @example
+     * socket.prependAnyOutgoing((event, ...args) => {
+     *   console.log(`sent event ${event}`);
+     * });
+     *
+     * @param listener
+     */
+    prependAnyOutgoing(listener) {
+        this._anyOutgoingListeners = this._anyOutgoingListeners || [];
+        this._anyOutgoingListeners.unshift(listener);
+        return this;
+    }
+    /**
+     * Removes the listener that will be fired when any event is emitted.
+     *
+     * @example
+     * const catchAllListener = (event, ...args) => {
+     *   console.log(`sent event ${event}`);
+     * }
+     *
+     * socket.onAnyOutgoing(catchAllListener);
+     *
+     * // remove a specific listener
+     * socket.offAnyOutgoing(catchAllListener);
+     *
+     * // or remove all listeners
+     * socket.offAnyOutgoing();
+     *
+     * @param [listener] - the catch-all listener (optional)
+     */
+    offAnyOutgoing(listener) {
+        if (!this._anyOutgoingListeners) {
+            return this;
+        }
+        if (listener) {
+            const listeners = this._anyOutgoingListeners;
+            for (let i = 0; i < listeners.length; i++) {
+                if (listener === listeners[i]) {
+                    listeners.splice(i, 1);
+                    return this;
+                }
+            }
+        }
+        else {
+            this._anyOutgoingListeners = [];
+        }
+        return this;
+    }
+    /**
+     * Returns an array of listeners that are listening for any event that is specified. This array can be manipulated,
+     * e.g. to remove listeners.
+     */
+    listenersAnyOutgoing() {
+        return this._anyOutgoingListeners || [];
+    }
+    /**
+     * Notify the listeners for each packet sent
+     *
+     * @param packet
+     *
+     * @private
+     */
+    notifyOutgoingListeners(packet) {
+        if (this._anyOutgoingListeners && this._anyOutgoingListeners.length) {
+            const listeners = this._anyOutgoingListeners.slice();
+            for (const listener of listeners) {
+                listener.apply(this, packet.data);
+            }
+        }
+    }
+}
+
+/**
+ * Initialize backoff timer with `opts`.
+ *
+ * - `min` initial timeout in milliseconds [100]
+ * - `max` max timeout [10000]
+ * - `jitter` [0]
+ * - `factor` [2]
+ *
+ * @param {Object} opts
+ * @api public
+ */
+function Backoff(opts) {
+    opts = opts || {};
+    this.ms = opts.min || 100;
+    this.max = opts.max || 10000;
+    this.factor = opts.factor || 2;
+    this.jitter = opts.jitter > 0 && opts.jitter <= 1 ? opts.jitter : 0;
+    this.attempts = 0;
+}
+/**
+ * Return the backoff duration.
+ *
+ * @return {Number}
+ * @api public
+ */
+Backoff.prototype.duration = function () {
+    var ms = this.ms * Math.pow(this.factor, this.attempts++);
+    if (this.jitter) {
+        var rand = Math.random();
+        var deviation = Math.floor(rand * this.jitter * ms);
+        ms = (Math.floor(rand * 10) & 1) == 0 ? ms - deviation : ms + deviation;
+    }
+    return Math.min(ms, this.max) | 0;
+};
+/**
+ * Reset the number of attempts.
+ *
+ * @api public
+ */
+Backoff.prototype.reset = function () {
+    this.attempts = 0;
+};
+/**
+ * Set the minimum duration
+ *
+ * @api public
+ */
+Backoff.prototype.setMin = function (min) {
+    this.ms = min;
+};
+/**
+ * Set the maximum duration
+ *
+ * @api public
+ */
+Backoff.prototype.setMax = function (max) {
+    this.max = max;
+};
+/**
+ * Set the jitter
+ *
+ * @api public
+ */
+Backoff.prototype.setJitter = function (jitter) {
+    this.jitter = jitter;
+};
+
+class Manager extends Emitter {
+    constructor(uri, opts) {
+        var _a;
+        super();
+        this.nsps = {};
+        this.subs = [];
+        if (uri && "object" === typeof uri) {
+            opts = uri;
+            uri = undefined;
+        }
+        opts = opts || {};
+        opts.path = opts.path || "/socket.io";
+        this.opts = opts;
+        installTimerFunctions(this, opts);
+        this.reconnection(opts.reconnection !== false);
+        this.reconnectionAttempts(opts.reconnectionAttempts || Infinity);
+        this.reconnectionDelay(opts.reconnectionDelay || 1000);
+        this.reconnectionDelayMax(opts.reconnectionDelayMax || 5000);
+        this.randomizationFactor((_a = opts.randomizationFactor) !== null && _a !== void 0 ? _a : 0.5);
+        this.backoff = new Backoff({
+            min: this.reconnectionDelay(),
+            max: this.reconnectionDelayMax(),
+            jitter: this.randomizationFactor(),
+        });
+        this.timeout(null == opts.timeout ? 20000 : opts.timeout);
+        this._readyState = "closed";
+        this.uri = uri;
+        const _parser = opts.parser || parser$2;
+        this.encoder = new _parser.Encoder();
+        this.decoder = new _parser.Decoder();
+        this._autoConnect = opts.autoConnect !== false;
+        if (this._autoConnect)
+            this.open();
+    }
+    reconnection(v) {
+        if (!arguments.length)
+            return this._reconnection;
+        this._reconnection = !!v;
+        if (!v) {
+            this.skipReconnect = true;
+        }
+        return this;
+    }
+    reconnectionAttempts(v) {
+        if (v === undefined)
+            return this._reconnectionAttempts;
+        this._reconnectionAttempts = v;
+        return this;
+    }
+    reconnectionDelay(v) {
+        var _a;
+        if (v === undefined)
+            return this._reconnectionDelay;
+        this._reconnectionDelay = v;
+        (_a = this.backoff) === null || _a === void 0 ? void 0 : _a.setMin(v);
+        return this;
+    }
+    randomizationFactor(v) {
+        var _a;
+        if (v === undefined)
+            return this._randomizationFactor;
+        this._randomizationFactor = v;
+        (_a = this.backoff) === null || _a === void 0 ? void 0 : _a.setJitter(v);
+        return this;
+    }
+    reconnectionDelayMax(v) {
+        var _a;
+        if (v === undefined)
+            return this._reconnectionDelayMax;
+        this._reconnectionDelayMax = v;
+        (_a = this.backoff) === null || _a === void 0 ? void 0 : _a.setMax(v);
+        return this;
+    }
+    timeout(v) {
+        if (!arguments.length)
+            return this._timeout;
+        this._timeout = v;
+        return this;
+    }
+    /**
+     * Starts trying to reconnect if reconnection is enabled and we have not
+     * started reconnecting yet
+     *
+     * @private
+     */
+    maybeReconnectOnOpen() {
+        // Only try to reconnect if it's the first time we're connecting
+        if (!this._reconnecting &&
+            this._reconnection &&
+            this.backoff.attempts === 0) {
+            // keeps reconnection from firing twice for the same reconnection loop
+            this.reconnect();
+        }
+    }
+    /**
+     * Sets the current transport `socket`.
+     *
+     * @param {Function} fn - optional, callback
+     * @return self
+     * @public
+     */
+    open(fn) {
+        if (~this._readyState.indexOf("open"))
+            return this;
+        this.engine = new Socket$1(this.uri, this.opts);
+        const socket = this.engine;
+        const self = this;
+        this._readyState = "opening";
+        this.skipReconnect = false;
+        // emit `open`
+        const openSubDestroy = on(socket, "open", function () {
+            self.onopen();
+            fn && fn();
+        });
+        const onError = (err) => {
+            this.cleanup();
+            this._readyState = "closed";
+            this.emitReserved("error", err);
+            if (fn) {
+                fn(err);
+            }
+            else {
+                // Only do this if there is no fn to handle the error
+                this.maybeReconnectOnOpen();
+            }
+        };
+        // emit `error`
+        const errorSub = on(socket, "error", onError);
+        if (false !== this._timeout) {
+            const timeout = this._timeout;
+            // set timer
+            const timer = this.setTimeoutFn(() => {
+                openSubDestroy();
+                onError(new Error("timeout"));
+                socket.close();
+            }, timeout);
+            if (this.opts.autoUnref) {
+                timer.unref();
+            }
+            this.subs.push(() => {
+                this.clearTimeoutFn(timer);
+            });
+        }
+        this.subs.push(openSubDestroy);
+        this.subs.push(errorSub);
+        return this;
+    }
+    /**
+     * Alias for open()
+     *
+     * @return self
+     * @public
+     */
+    connect(fn) {
+        return this.open(fn);
+    }
+    /**
+     * Called upon transport open.
+     *
+     * @private
+     */
+    onopen() {
+        // clear old subs
+        this.cleanup();
+        // mark as open
+        this._readyState = "open";
+        this.emitReserved("open");
+        // add new subs
+        const socket = this.engine;
+        this.subs.push(on(socket, "ping", this.onping.bind(this)), on(socket, "data", this.ondata.bind(this)), on(socket, "error", this.onerror.bind(this)), on(socket, "close", this.onclose.bind(this)), 
+        // @ts-ignore
+        on(this.decoder, "decoded", this.ondecoded.bind(this)));
+    }
+    /**
+     * Called upon a ping.
+     *
+     * @private
+     */
+    onping() {
+        this.emitReserved("ping");
+    }
+    /**
+     * Called with data.
+     *
+     * @private
+     */
+    ondata(data) {
+        try {
+            this.decoder.add(data);
+        }
+        catch (e) {
+            this.onclose("parse error", e);
+        }
+    }
+    /**
+     * Called when parser fully decodes a packet.
+     *
+     * @private
+     */
+    ondecoded(packet) {
+        // the nextTick call prevents an exception in a user-provided event listener from triggering a disconnection due to a "parse error"
+        nextTick(() => {
+            this.emitReserved("packet", packet);
+        }, this.setTimeoutFn);
+    }
+    /**
+     * Called upon socket error.
+     *
+     * @private
+     */
+    onerror(err) {
+        this.emitReserved("error", err);
+    }
+    /**
+     * Creates a new socket for the given `nsp`.
+     *
+     * @return {Socket}
+     * @public
+     */
+    socket(nsp, opts) {
+        let socket = this.nsps[nsp];
+        if (!socket) {
+            socket = new Socket(this, nsp, opts);
+            this.nsps[nsp] = socket;
+        }
+        else if (this._autoConnect && !socket.active) {
+            socket.connect();
+        }
+        return socket;
+    }
+    /**
+     * Called upon a socket close.
+     *
+     * @param socket
+     * @private
+     */
+    _destroy(socket) {
+        const nsps = Object.keys(this.nsps);
+        for (const nsp of nsps) {
+            const socket = this.nsps[nsp];
+            if (socket.active) {
+                return;
+            }
+        }
+        this._close();
+    }
+    /**
+     * Writes a packet.
+     *
+     * @param packet
+     * @private
+     */
+    _packet(packet) {
+        const encodedPackets = this.encoder.encode(packet);
+        for (let i = 0; i < encodedPackets.length; i++) {
+            this.engine.write(encodedPackets[i], packet.options);
+        }
+    }
+    /**
+     * Clean up transport subscriptions and packet buffer.
+     *
+     * @private
+     */
+    cleanup() {
+        this.subs.forEach((subDestroy) => subDestroy());
+        this.subs.length = 0;
+        this.decoder.destroy();
+    }
+    /**
+     * Close the current socket.
+     *
+     * @private
+     */
+    _close() {
+        this.skipReconnect = true;
+        this._reconnecting = false;
+        this.onclose("forced close");
+    }
+    /**
+     * Alias for close()
+     *
+     * @private
+     */
+    disconnect() {
+        return this._close();
+    }
+    /**
+     * Called when:
+     *
+     * - the low-level engine is closed
+     * - the parser encountered a badly formatted packet
+     * - all sockets are disconnected
+     *
+     * @private
+     */
+    onclose(reason, description) {
+        var _a;
+        this.cleanup();
+        (_a = this.engine) === null || _a === void 0 ? void 0 : _a.close();
+        this.backoff.reset();
+        this._readyState = "closed";
+        this.emitReserved("close", reason, description);
+        if (this._reconnection && !this.skipReconnect) {
+            this.reconnect();
+        }
+    }
+    /**
+     * Attempt a reconnection.
+     *
+     * @private
+     */
+    reconnect() {
+        if (this._reconnecting || this.skipReconnect)
+            return this;
+        const self = this;
+        if (this.backoff.attempts >= this._reconnectionAttempts) {
+            this.backoff.reset();
+            this.emitReserved("reconnect_failed");
+            this._reconnecting = false;
+        }
+        else {
+            const delay = this.backoff.duration();
+            this._reconnecting = true;
+            const timer = this.setTimeoutFn(() => {
+                if (self.skipReconnect)
+                    return;
+                this.emitReserved("reconnect_attempt", self.backoff.attempts);
+                // check again for the case socket closed in above events
+                if (self.skipReconnect)
+                    return;
+                self.open((err) => {
+                    if (err) {
+                        self._reconnecting = false;
+                        self.reconnect();
+                        this.emitReserved("reconnect_error", err);
+                    }
+                    else {
+                        self.onreconnect();
+                    }
+                });
+            }, delay);
+            if (this.opts.autoUnref) {
+                timer.unref();
+            }
+            this.subs.push(() => {
+                this.clearTimeoutFn(timer);
+            });
+        }
+    }
+    /**
+     * Called upon successful reconnect.
+     *
+     * @private
+     */
+    onreconnect() {
+        const attempt = this.backoff.attempts;
+        this._reconnecting = false;
+        this.backoff.reset();
+        this.emitReserved("reconnect", attempt);
+    }
+}
+
+/**
+ * Managers cache.
+ */
+const cache$2 = {};
+function lookup(uri, opts) {
+    if (typeof uri === "object") {
+        opts = uri;
+        uri = undefined;
+    }
+    opts = opts || {};
+    const parsed = url(uri, opts.path || "/socket.io");
+    const source = parsed.source;
+    const id = parsed.id;
+    const path = parsed.path;
+    const sameNamespace = cache$2[id] && path in cache$2[id]["nsps"];
+    const newConnection = opts.forceNew ||
+        opts["force new connection"] ||
+        false === opts.multiplex ||
+        sameNamespace;
+    let io;
+    if (newConnection) {
+        io = new Manager(source, opts);
+    }
+    else {
+        if (!cache$2[id]) {
+            cache$2[id] = new Manager(source, opts);
+        }
+        io = cache$2[id];
+    }
+    if (parsed.query && !opts.query) {
+        opts.query = parsed.queryKey;
+    }
+    return io.socket(parsed.path, opts);
+}
+// so that "lookup" can be used both as a function (e.g. `io(...)`) and as a
+// namespace (e.g. `io.connect(...)`), for backward compatibility
+Object.assign(lookup, {
+    Manager,
+    Socket,
+    io: lookup,
+    connect: lookup,
+});
+
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
 function getAugmentedNamespace(n) {
@@ -3800,10 +7824,10 @@ const udomdiff = (parentNode, a, b, get, before) => {
       // or asymmetric too
       // [1, 2, 3, 4, 5]
       // [1, 2, 3, 5, 6, 4]
-      const node = get(a[--aEnd], -1).nextSibling;
+      const node = get(a[--aEnd], -0).nextSibling;
       parentNode.insertBefore(
         get(b[bStart++], 1),
-        get(a[aStart++], -1).nextSibling
+        get(a[aStart++], -0).nextSibling
       );
       parentNode.insertBefore(get(b[--bEnd], 1), node);
       // mark the future index as identical (yeah, it's dirty, but cheap 👍)
@@ -3877,7 +7901,7 @@ const udomdiff = (parentNode, a, b, get, before) => {
   return b;
 };
 
-const { isArray: isArray$3 } = Array;
+const { isArray: isArray$2 } = Array;
 const { getPrototypeOf: getPrototypeOf$1, getOwnPropertyDescriptor } = Object;
 
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
@@ -3926,7 +7950,6 @@ const ELEMENT_NODE = 1;
 const COMMENT_NODE = 8;
 const DOCUMENT_FRAGMENT_NODE = 11;
 
-/*! (c) Andrea Giammarchi - ISC */
 const {setPrototypeOf} = Object;
 
 /**
@@ -4083,7 +8106,7 @@ const at = (element, value, name) => {
   const known = listeners.get(element) || set(listeners, element, {});
   let current = known[name];
   if (current && current[0]) element.removeEventListener(name, ...current);
-  current = isArray$3(value) ? value : [value, false];
+  current = isArray$2(value) ? value : [value, false];
   known[name] = current;
   if (current[0]) element.addEventListener(name, ...current);
   return value;
@@ -4380,8 +8403,6 @@ const create = parse => (
 const TEXT_ELEMENTS = /^(?:plaintext|script|style|textarea|title|xmp)$/i;
 const VOID_ELEMENTS = /^(?:area|base|br|col|embed|hr|img|input|keygen|link|menuitem|meta|param|source|track|wbr)$/i;
 
-/*! (c) Andrea Giammarchi - ISC */
-
 const elements = /<([a-zA-Z0-9]+[a-zA-Z0-9:._-]*)([^>]*?)(\/?)>/g;
 const attributes = /([^\s\\>"'=]+)\s*=\s*(['"]?)\x01/g;
 const holes = /[\x01\x02]/g;
@@ -4488,7 +8509,7 @@ const resolve = (template, values, xml) => {
       if (node.nodeType === COMMENT_NODE) {
         if (node.data === search) {
           // ⚠️ once array, always array!
-          const update = isArray$3(values[i - 1]) ? array : hole;
+          const update = isArray$2(values[i - 1]) ? array : hole;
           if (update === hole) replace.push(node);
           entries.push(abc(createPath(node), update, null));
           search = `${prefix}${i++}`;
@@ -4691,7 +8712,7 @@ var lowercase = function (string) {
  * @param {*} value Reference to check.
  * @returns {boolean} True if `value` is an `Array`.
  */
-var isArray$2 = Array.isArray;
+var isArray$1 = Array.isArray;
 
 var manualLowercase = function (s) {
 	return isString(s)
@@ -4706,6 +8727,17 @@ var manualLowercase = function (s) {
 // with correct but slower alternatives. See https://github.com/angular/angular.js/issues/11387
 if ("I".toLowerCase() !== "i") {
 	lowercase = manualLowercase;
+}
+
+// Run a function and disallow temporarly the use of the Function constructor
+// This makes arbitrary code generation attacks way more complicated.
+function runWithFunctionConstructorProtection(fn) {
+	var originalFunctionConstructor = Function.prototype.constructor;
+	delete Function.prototype.constructor;
+	var result = fn();
+	// eslint-disable-next-line no-extend-native
+	Function.prototype.constructor = originalFunctionConstructor;
+	return result;
 }
 
 var jqLite, // delay binding since jQuery could be loaded after us.
@@ -4729,7 +8761,7 @@ function isArrayLike$1(obj) {
 	// * jqLite is either the jQuery or jqLite constructor function
 	// * we have to check the existence of jqLite first as this method is called
 	//   via the forEach method when constructing the jqLite object in the first place
-	if (isArray$2(obj) || isString(obj) || (jqLite)) {
+	if (isArray$1(obj) || isString(obj) || (jqLite)) {
 		return true;
 	}
 
@@ -4795,7 +8827,7 @@ function forEach(obj, iterator, context) {
 					iterator.call(context, obj[key], key, obj);
 				}
 			}
-		} else if (isArray$2(obj) || isArrayLike$1(obj)) {
+		} else if (isArray$1(obj) || isArrayLike$1(obj)) {
 			var isPrimitive = typeof obj !== "object";
 			for (key = 0, length = obj.length; key < length; key++) {
 				if (isPrimitive || key in obj) {
@@ -5045,7 +9077,7 @@ function copy(source, destination) {
 	function copyRecurse(source, destination) {
 		var h = destination.$$hashKey;
 		var key;
-		if (isArray$2(source)) {
+		if (isArray$1(source)) {
 			for (var i = 0, ii = source.length; i < ii; i++) {
 				destination.push(copyElement(source[i]));
 			}
@@ -5097,7 +9129,7 @@ function copy(source, destination) {
 		var destination = copyType(source);
 
 		if (destination === undefined) {
-			destination = isArray$2(source)
+			destination = isArray$1(source)
 				? []
 				: Object.create(getPrototypeOf(source));
 			needsRecurse = true;
@@ -5385,7 +9417,7 @@ var ESCAPE = {
  * @constructor
  */
 function Lexer$1(options) {
-	this.options = options;
+	this.options = options || {};
 }
 
 Lexer$1.prototype = {
@@ -6312,14 +10344,27 @@ ASTCompiler.prototype = {
 			extra +
 			this.watchFns() +
 			"return fn;";
+
 		// eslint-disable-next-line no-new-func
-		var fn = new Function(
+		var wrappedFn = new Function(
 			"$filter",
 			"getStringValue",
 			"ifDefined",
 			"plus",
 			fnString
 		)(this.$filter, getStringValue, ifDefined, plusFn);
+
+		var fn = function (s, l, a, i) {
+			return runWithFunctionConstructorProtection(function () {
+				return wrappedFn(s, l, a, i);
+			});
+		};
+		fn.assign = function (s, v, l) {
+			return runWithFunctionConstructorProtection(function () {
+				return wrappedFn.assign(s, v, l);
+			});
+		};
+		fn.inputs = wrappedFn.inputs;
 
 		this.state = this.stage = undefined;
 		fn.ast = ast;
@@ -6514,7 +10559,12 @@ ASTCompiler.prototype = {
 						);
 					},
 					intoId &&
-						self.lazyAssign(intoId, self.nonComputedMember("l", ast.name))
+						function () {
+							self.if_(
+								self.hasOwnProperty_("l", ast.name),
+								self.lazyAssign(intoId, self.nonComputedMember("l", ast.name))
+							);
+						}
 				);
 				recursionFn(intoId);
 				break;
@@ -6788,7 +10838,7 @@ ASTCompiler.prototype = {
 	},
 
 	filter: function (filterName) {
-		if (!this.state.filters.hasOwnProperty(filterName)) {
+		if (!hasOwnProperty.call(this.state.filters, filterName)) {
 			this.state.filters[filterName] = this.nextId(true);
 		}
 		return this.state.filters[filterName];
@@ -6880,7 +10930,7 @@ ASTCompiler.prototype = {
 			left +
 			"[" +
 			right +
-			"] : null)"
+			"] : undefined)"
 		);
 	},
 
@@ -6997,7 +11047,7 @@ ASTInterpreter.prototype = {
 		forEach(ast.body, function (expression) {
 			expressions.push(self.recurse(expression.expression));
 		});
-		var fn =
+		var wrappedFn =
 			ast.body.length === 0
 				? noop$1
 				: ast.body.length === 1
@@ -7011,10 +11061,22 @@ ASTInterpreter.prototype = {
 						};
 
 		if (assign) {
-			fn.assign = function (scope, value, locals) {
+			wrappedFn.assign = function (scope, value, locals) {
 				return assign(scope, locals, value);
 			};
 		}
+
+		var fn = function (scope, locals) {
+			return runWithFunctionConstructorProtection(function () {
+				return wrappedFn(scope, locals);
+			});
+		};
+		fn.assign = function (scope, value, locals) {
+			return runWithFunctionConstructorProtection(function () {
+				return wrappedFn.assign(scope, value, locals);
+			});
+		};
+
 		if (inputs) {
 			fn.inputs = inputs;
 		}
@@ -7342,7 +11404,10 @@ ASTInterpreter.prototype = {
 			if (create && create !== 1 && base && base[name] == null) {
 				base[name] = {};
 			}
-			var value = base ? base[name] : undefined;
+			var value;
+			if (base && hasOwnProperty.call(base, name)) {
+				value = base ? base[name] : undefined;
+			}
 			if (context) {
 				return { context: base, name: name, value: value };
 			}
@@ -7407,6 +11472,8 @@ ASTInterpreter.prototype = {
 var Parser$1 = function Parser(lexer, $filter, options) {
 	this.lexer = lexer;
 	this.$filter = $filter;
+	options = options || {};
+	options.handleThis = options.handleThis != null ? options.handleThis : true;
 	this.options = options;
 	this.ast = new AST(lexer, options);
 	this.ast.selfReferential = {
@@ -7583,7 +11650,7 @@ function promisifyRequest(request) {
         request.addEventListener('success', success);
         request.addEventListener('error', error);
     });
-    // This mapping exists in reverseTransformCache but doesn't doesn't exist in transformCache. This
+    // This mapping exists in reverseTransformCache but doesn't exist in transformCache. This
     // is because we create many promises from a single IDBRequest.
     reverseTransformCache.set(promise, request);
     return promise;
@@ -8885,7 +12952,7 @@ function unzipSync(data, opts) {
     return files;
 }
 
-const e$1=(()=>{if("undefined"==typeof self)return !1;if("top"in self&&self!==top)try{top.window.document._=0;}catch(e){return !1}return "showOpenFilePicker"in self})(),t$1=e$1?Promise.resolve().then(function(){return l}):Promise.resolve().then(function(){return v});async function n(...e){return (await t$1).default(...e)}e$1?Promise.resolve().then(function(){return y}):Promise.resolve().then(function(){return b});const a=e$1?Promise.resolve().then(function(){return m}):Promise.resolve().then(function(){return k});async function o$1(...e){return (await a).default(...e)}const s=async e=>{const t=await e.getFile();return t.handle=e,t};var c=async(e=[{}])=>{Array.isArray(e)||(e=[e]);const t=[];e.forEach((e,n)=>{t[n]={description:e.description||"Files",accept:{}},e.mimeTypes?e.mimeTypes.map(r=>{t[n].accept[r]=e.extensions||[];}):t[n].accept["*/*"]=e.extensions||[];});const n=await window.showOpenFilePicker({id:e[0].id,startIn:e[0].startIn,types:t,multiple:e[0].multiple||!1,excludeAcceptAllOption:e[0].excludeAcceptAllOption||!1}),r=await Promise.all(n.map(s));return e[0].multiple?r:r[0]},l={__proto__:null,default:c};function u(e){function t(e){if(Object(e)!==e)return Promise.reject(new TypeError(e+" is not an object."));var t=e.done;return Promise.resolve(e.value).then(function(e){return {value:e,done:t}})}return u=function(e){this.s=e,this.n=e.next;},u.prototype={s:null,n:null,next:function(){return t(this.n.apply(this.s,arguments))},return:function(e){var n=this.s.return;return void 0===n?Promise.resolve({value:e,done:!0}):t(n.apply(this.s,arguments))},throw:function(e){var n=this.s.return;return void 0===n?Promise.reject(e):t(n.apply(this.s,arguments))}},new u(e)}const p=async(e,t,n=e.name,r)=>{const i=[],a=[];var o,s=!1,c=!1;try{for(var l,d=function(e){var t,n,r,i=2;for("undefined"!=typeof Symbol&&(n=Symbol.asyncIterator,r=Symbol.iterator);i--;){if(n&&null!=(t=e[n]))return t.call(e);if(r&&null!=(t=e[r]))return new u(t.call(e));n="@@asyncIterator",r="@@iterator";}throw new TypeError("Object is not async iterable")}(e.values());s=!(l=await d.next()).done;s=!1){const o=l.value,s=`${n}/${o.name}`;"file"===o.kind?a.push(o.getFile().then(t=>(t.directoryHandle=e,t.handle=o,Object.defineProperty(t,"webkitRelativePath",{configurable:!0,enumerable:!0,get:()=>s})))):"directory"!==o.kind||!t||r&&r(o)||i.push(p(o,t,s,r));}}catch(e){c=!0,o=e;}finally{try{s&&null!=d.return&&await d.return();}finally{if(c)throw o}}return [...(await Promise.all(i)).flat(),...await Promise.all(a)]};var d=async(e={})=>{e.recursive=e.recursive||!1,e.mode=e.mode||"read";const t=await window.showDirectoryPicker({id:e.id,startIn:e.startIn,mode:e.mode});return (await(await t.values()).next()).done?[t]:p(t,e.recursive,void 0,e.skipDirectory)},y={__proto__:null,default:d},f$1=async(e,t=[{}],n=null,r=!1,i=null)=>{Array.isArray(t)||(t=[t]),t[0].fileName=t[0].fileName||"Untitled";const a=[];let o=null;if(e instanceof Blob&&e.type?o=e.type:e.headers&&e.headers.get("content-type")&&(o=e.headers.get("content-type")),t.forEach((e,t)=>{a[t]={description:e.description||"Files",accept:{}},e.mimeTypes?(0===t&&o&&e.mimeTypes.push(o),e.mimeTypes.map(n=>{a[t].accept[n]=e.extensions||[];})):o?a[t].accept[o]=e.extensions||[]:a[t].accept["*/*"]=e.extensions||[];}),n)try{await n.getFile();}catch(e){if(n=null,r)throw e}const s=n||await window.showSaveFilePicker({suggestedName:t[0].fileName,id:t[0].id,startIn:t[0].startIn,types:a,excludeAcceptAllOption:t[0].excludeAcceptAllOption||!1});!n&&i&&i(s);const c=await s.createWritable();if("stream"in e){const t=e.stream();return await t.pipeTo(c),s}return "body"in e?(await e.body.pipeTo(c),s):(await c.write(await e),await c.close(),s)},m={__proto__:null,default:f$1},w=async(e=[{}])=>(Array.isArray(e)||(e=[e]),new Promise((t,n)=>{const r=document.createElement("input");r.type="file";const i=[...e.map(e=>e.mimeTypes||[]),...e.map(e=>e.extensions||[])].join();r.multiple=e[0].multiple||!1,r.accept=i||"",r.style.display="none",document.body.append(r);const a=e=>{"function"==typeof o&&o(),t(e);},o=e[0].legacySetup&&e[0].legacySetup(a,()=>o(n),r),s=()=>{window.removeEventListener("focus",s),r.remove();};r.addEventListener("click",()=>{window.addEventListener("focus",s);}),r.addEventListener("change",()=>{window.removeEventListener("focus",s),r.remove(),a(r.multiple?Array.from(r.files):r.files[0]);}),"showPicker"in HTMLInputElement.prototype?r.showPicker():r.click();})),v={__proto__:null,default:w},h=async(e=[{}])=>(Array.isArray(e)||(e=[e]),e[0].recursive=e[0].recursive||!1,new Promise((t,n)=>{const r=document.createElement("input");r.type="file",r.webkitdirectory=!0;const i=e=>{"function"==typeof a&&a(),t(e);},a=e[0].legacySetup&&e[0].legacySetup(i,()=>a(n),r);r.addEventListener("change",()=>{let t=Array.from(r.files);e[0].recursive?e[0].recursive&&e[0].skipDirectory&&(t=t.filter(t=>t.webkitRelativePath.split("/").every(t=>!e[0].skipDirectory({name:t,kind:"directory"})))):t=t.filter(e=>2===e.webkitRelativePath.split("/").length),i(t);}),"showPicker"in HTMLInputElement.prototype?r.showPicker():r.click();})),b={__proto__:null,default:h},P=async(e,t={})=>{Array.isArray(t)&&(t=t[0]);const n=document.createElement("a");let r=e;"body"in e&&(r=await async function(e,t){const n=e.getReader(),r=new ReadableStream({start:e=>async function t(){return n.read().then(({done:n,value:r})=>{if(!n)return e.enqueue(r),t();e.close();})}()}),i=new Response(r),a=await i.blob();return n.releaseLock(),new Blob([a],{type:t})}(e.body,e.headers.get("content-type"))),n.download=t.fileName||"Untitled",n.href=URL.createObjectURL(await r);const i=()=>{"function"==typeof a&&a();},a=t.legacySetup&&t.legacySetup(i,()=>a(),n);return n.addEventListener("click",()=>{setTimeout(()=>URL.revokeObjectURL(n.href),3e4),i();}),n.click(),null},k={__proto__:null,default:P};
+const e$1=(()=>{if("undefined"==typeof self)return  false;if("top"in self&&self!==top)try{top.window.document._=0;}catch(e){return  false}return "showOpenFilePicker"in self})(),t$1=e$1?Promise.resolve().then(function(){return l}):Promise.resolve().then(function(){return v});async function n(...e){return (await t$1).default(...e)}e$1?Promise.resolve().then(function(){return y}):Promise.resolve().then(function(){return b});const a=e$1?Promise.resolve().then(function(){return m}):Promise.resolve().then(function(){return k});async function o$1(...e){return (await a).default(...e)}const s=async e=>{const t=await e.getFile();return t.handle=e,t};var c=async(e=[{}])=>{Array.isArray(e)||(e=[e]);const t=[];e.forEach((e,n)=>{t[n]={description:e.description||"Files",accept:{}},e.mimeTypes?e.mimeTypes.map(r=>{t[n].accept[r]=e.extensions||[];}):t[n].accept["*/*"]=e.extensions||[];});const n=await window.showOpenFilePicker({id:e[0].id,startIn:e[0].startIn,types:t,multiple:e[0].multiple||false,excludeAcceptAllOption:e[0].excludeAcceptAllOption||false}),r=await Promise.all(n.map(s));return e[0].multiple?r:r[0]},l={__proto__:null,default:c};function u(e){function t(e){if(Object(e)!==e)return Promise.reject(new TypeError(e+" is not an object."));var t=e.done;return Promise.resolve(e.value).then(function(e){return {value:e,done:t}})}return u=function(e){this.s=e,this.n=e.next;},u.prototype={s:null,n:null,next:function(){return t(this.n.apply(this.s,arguments))},return:function(e){var n=this.s.return;return void 0===n?Promise.resolve({value:e,done:true}):t(n.apply(this.s,arguments))},throw:function(e){var n=this.s.return;return void 0===n?Promise.reject(e):t(n.apply(this.s,arguments))}},new u(e)}const p=async(e,t,n=e.name,r)=>{const i=[],a=[];var o,s=false,c=false;try{for(var l,d=function(e){var t,n,r,i=2;for("undefined"!=typeof Symbol&&(n=Symbol.asyncIterator,r=Symbol.iterator);i--;){if(n&&null!=(t=e[n]))return t.call(e);if(r&&null!=(t=e[r]))return new u(t.call(e));n="@@asyncIterator",r="@@iterator";}throw new TypeError("Object is not async iterable")}(e.values());s=!(l=await d.next()).done;s=!1){const o=l.value,s=`${n}/${o.name}`;"file"===o.kind?a.push(o.getFile().then(t=>(t.directoryHandle=e,t.handle=o,Object.defineProperty(t,"webkitRelativePath",{configurable:!0,enumerable:!0,get:()=>s})))):"directory"!==o.kind||!t||r&&r(o)||i.push(p(o,t,s,r));}}catch(e){c=true,o=e;}finally{try{s&&null!=d.return&&await d.return();}finally{if(c)throw o}}return [...(await Promise.all(i)).flat(),...await Promise.all(a)]};var d=async(e={})=>{e.recursive=e.recursive||false,e.mode=e.mode||"read";const t=await window.showDirectoryPicker({id:e.id,startIn:e.startIn,mode:e.mode});return (await(await t.values()).next()).done?[t]:p(t,e.recursive,void 0,e.skipDirectory)},y={__proto__:null,default:d},f$1=async(e,t=[{}],n=null,r=false,i=null)=>{Array.isArray(t)||(t=[t]),t[0].fileName=t[0].fileName||"Untitled";const a=[];let o=null;if(e instanceof Blob&&e.type?o=e.type:e.headers&&e.headers.get("content-type")&&(o=e.headers.get("content-type")),t.forEach((e,t)=>{a[t]={description:e.description||"Files",accept:{}},e.mimeTypes?(0===t&&o&&e.mimeTypes.push(o),e.mimeTypes.map(n=>{a[t].accept[n]=e.extensions||[];})):o?a[t].accept[o]=e.extensions||[]:a[t].accept["*/*"]=e.extensions||[];}),n)try{await n.getFile();}catch(e){if(n=null,r)throw e}const s=n||await window.showSaveFilePicker({suggestedName:t[0].fileName,id:t[0].id,startIn:t[0].startIn,types:a,excludeAcceptAllOption:t[0].excludeAcceptAllOption||false});!n&&i&&i(s);const c=await s.createWritable();if("stream"in e){const t=e.stream();return await t.pipeTo(c),s}return "body"in e?(await e.body.pipeTo(c),s):(await c.write(await e),await c.close(),s)},m={__proto__:null,default:f$1},w=async(e=[{}])=>(Array.isArray(e)||(e=[e]),new Promise((t,n)=>{const r=document.createElement("input");r.type="file";const i=[...e.map(e=>e.mimeTypes||[]),...e.map(e=>e.extensions||[])].join();r.multiple=e[0].multiple||false,r.accept=i||"",r.style.display="none",document.body.append(r);const a=e=>{"function"==typeof o&&o(),t(e);},o=e[0].legacySetup&&e[0].legacySetup(a,()=>o(n),r),s=()=>{window.removeEventListener("focus",s),r.remove();};r.addEventListener("click",()=>{window.addEventListener("focus",s);}),r.addEventListener("change",()=>{window.removeEventListener("focus",s),r.remove(),a(r.multiple?Array.from(r.files):r.files[0]);}),"showPicker"in HTMLInputElement.prototype?r.showPicker():r.click();})),v={__proto__:null,default:w},h=async(e=[{}])=>(Array.isArray(e)||(e=[e]),e[0].recursive=e[0].recursive||false,new Promise((t,n)=>{const r=document.createElement("input");r.type="file",r.webkitdirectory=true;const i=e=>{"function"==typeof a&&a(),t(e);},a=e[0].legacySetup&&e[0].legacySetup(i,()=>a(n),r);r.addEventListener("change",()=>{let t=Array.from(r.files);e[0].recursive?e[0].recursive&&e[0].skipDirectory&&(t=t.filter(t=>t.webkitRelativePath.split("/").every(t=>!e[0].skipDirectory({name:t,kind:"directory"})))):t=t.filter(e=>2===e.webkitRelativePath.split("/").length),i(t);}),"showPicker"in HTMLInputElement.prototype?r.showPicker():r.click();})),b={__proto__:null,default:h},P=async(e,t={})=>{Array.isArray(t)&&(t=t[0]);const n=document.createElement("a");let r=e;"body"in e&&(r=await async function(e,t){const n=e.getReader(),r=new ReadableStream({start:e=>async function t(){return n.read().then(({done:n,value:r})=>{if(!n)return e.enqueue(r),t();e.close();})}()}),i=new Response(r),a=await i.blob();return n.releaseLock(),new Blob([a],{type:t})}(e.body,e.headers.get("content-type"))),n.download=t.fileName||"Untitled",n.href=URL.createObjectURL(await r);const i=()=>{"function"==typeof a&&a();},a=t.legacySetup&&t.legacySetup(i,()=>a(),n);return n.addEventListener("click",()=>{setTimeout(()=>URL.revokeObjectURL(n.href),3e4),i();}),n.click(),null},k={__proto__:null,default:P};
 
 class DB {
   constructor() {
@@ -12424,7 +16491,7 @@ class Data {
   }
 }
 
-const e=Object.assign||((e,t)=>(t&&Object.keys(t).forEach(o=>e[o]=t[o]),e)),t=(e,r,s)=>{const c=typeof s;if(s&&"object"===c)if(Array.isArray(s))for(const o of s)r=t(e,r,o);else for(const c of Object.keys(s)){const f=s[c];"function"==typeof f?r[c]=f(r[c],o):void 0===f?e&&!isNaN(c)?r.splice(c,1):delete r[c]:null===f||"object"!=typeof f||Array.isArray(f)?r[c]=f:"object"==typeof r[c]?r[c]=f===r[c]?f:o(r[c],f):r[c]=t(!1,{},f);}else "function"===c&&(r=s(r,o));return r},o=(o,...r)=>{const s=Array.isArray(o);return t(s,s?o.slice():e({},o),r)};
+const e=Object.assign||((e,t)=>(t&&Object.keys(t).forEach(o=>e[o]=t[o]),e)),t=(e,r,s)=>{const c=typeof s;if(s&&"object"===c)if(Array.isArray(s))for(const o of s)r=t(e,r,o);else for(const c of Object.keys(s)){const f=s[c];"function"==typeof f?r[c]=f(r[c],o):void 0===f?e&&!isNaN(c)?r.splice(c,1):delete r[c]:null===f||"object"!=typeof f||Array.isArray(f)?r[c]=f:"object"==typeof r[c]?r[c]=f===r[c]?f:o(r[c],f):r[c]=t(false,{},f);}else "function"===c&&(r=s(r,o));return r},o=(o,...r)=>{const s=Array.isArray(o);return t(s,s?o.slice():e({},o),r)};
 
 let State$1 = class State {
   constructor(persistKey = "") {
@@ -13119,7 +17186,7 @@ class Grid extends TreeBase {
 }
 TreeBase.register(Grid, "Grid");
 
-const scriptRel = 'modulepreload';const assetsURL = function(dep) { return "/OS-DPI/"+dep };const seen = {};const __vitePreload = function preload(baseModule, deps, importerUrl) {
+const scriptRel = 'modulepreload';const assetsURL = function(dep) { return "/"+dep };const seen = {};const __vitePreload = function preload(baseModule, deps, importerUrl) {
   let promise = Promise.resolve();
   if (true && deps && deps.length > 0) {
     document.getElementsByTagName("link");
@@ -13180,7 +17247,7 @@ const scriptRel = 'modulepreload';const assetsURL = function(dep) { return "/OS-
 };
 
 async function readSheetFromBlob(blob) {
-  const XLSX = await __vitePreload(() => import('./xlsx.js'),true?[]:void 0);
+  const XLSX = await __vitePreload(() => import('./xlsx.Bblp-5-5.js'),true?[]:void 0);
   const data = await blob.arrayBuffer();
   const workbook = XLSX.read(data, { codepage: 65001 });
   /** @type {Rows} */
@@ -13259,7 +17326,7 @@ async function readSheetFromBlob(blob) {
  * @param {string} type
  */
 async function saveContent(name, rows, type) {
-  const XLSX = await __vitePreload(() => import('./xlsx.js'),true?[]:void 0);
+  const XLSX = await __vitePreload(() => import('./xlsx.Bblp-5-5.js'),true?[]:void 0);
   const sheetNames = new Set(rows.map((row) => row.sheetName || "sheet1"));
   const workbook = XLSX.utils.book_new();
   for (const sheetName of sheetNames) {
@@ -13586,18 +17653,26 @@ class Display extends TreeBase {
 }
 TreeBase.register(Display, "Display");
 
+// Option Class
 let Option$1 = class Option extends TreeBase {
-  name = new String$1("", { hiddenLabel: true });
-  value = new String$1("", { hiddenLabel: true });
+  name = new String$1("", { hiddenLabel: true }); // Hide label in settings
+  value = new String$1("", { hiddenLabel: true }); // Hide label in settings
+  selectedColor = new Color("pink", { hiddenLabel: true }); // Hide label
+  unselectedColor = new Color("lightgray", { hiddenLabel: true }); // Hide label
+  cache = {}; // Cache for performance or state management
 };
 TreeBase.register(Option$1, "Option");
 
+// Radio Class
 class Radio extends TreeBase {
-  scale = new Float(1);
-  label = new String$1("");
-  stateName = new String$1("$radio");
-  unselected = new Color("lightgray");
-  selected = new Color("pink");
+  // General Properties
+  scale = new Float(1); // Scale property
+  label = new String$1(""); // Label for the Radio group
+
+  // State Management Properties
+  primaryStateName = new String$1("$radio"); // Primary state name
+  secondaryStateName = new String$1("$secondaryRadio"); // Secondary state name
+  lastClickedStateName = new String$1("$LastClicked"); // Tracks the last clicked button
 
   allowedChildren = ["Option", "GridFilter"];
 
@@ -13609,86 +17684,157 @@ class Radio extends TreeBase {
   }
 
   /**
-   * true if there exist rows with the this.filters and the value
-   * @arg {Option} option
+   * Determines if an option is valid based on current filters and data.
+   * @param {Option} option
    * @returns {boolean}
    */
   valid(option) {
-    const { data } = Globals;
+    const { data, state } = Globals;
     const filters = this.filterChildren(GridFilter);
     return (
       !filters.length ||
-      data.hasMatchingRows(filters, {
-        states: {
-          [this.stateName.value]: option.value.value,
-        },
-      })
+      data.hasMatchingRows(
+        filters,
+        state.clone({
+          [this.primaryStateName.value]: option.value.value,
+          [this.secondaryStateName.value]: option.value.value,
+        }),
+        option.cache || {}
+      )
     );
   }
 
   /**
-   * handle clicks on the chooser
+   * Handles click events on the radio buttons.
+   * Defined as an arrow function to preserve 'this' context.
    * @param {MouseEvent} event
    */
-  handleClick({ target }) {
+  handleClick = ({ target }) => {
     if (target instanceof HTMLButtonElement) {
       const value = target.value;
-      const name = this.stateName.value;
-      Globals.state.update({ [name]: value });
+      const primaryState = this.primaryStateName.value;
+      const secondaryState = this.secondaryStateName.value;
+      const lastClickedState = this.lastClickedStateName.value;
+      const lastClicked = Globals.state.get(lastClickedState);
+      const stateUpdates = {};
+
+      if (lastClicked === value) {
+        // Toggle off if the same button is clicked again
+        stateUpdates[primaryState] = null;
+        stateUpdates[secondaryState] = null;
+        stateUpdates[lastClickedState] = null; // Optionally reset last clicked
+      } else {
+        // Set the new value for both primary and secondary states
+        stateUpdates[primaryState] = value;
+        stateUpdates[secondaryState] = value;
+        stateUpdates[lastClickedState] = value; // Update last clicked button
+      }
+
+      Globals.state.update(stateUpdates);
+    }
+  };
+
+  /**
+   * Initializes the primary and secondary states if they are not already set.
+   * This method should be called once after the component is mounted.
+   */
+  initializeStates() {
+    const { state } = Globals;
+    const primaryStateName = this.primaryStateName.value;
+    const secondaryStateName = this.secondaryStateName.value;
+
+    if (!state.get(primaryStateName)) {
+      const firstValidOption = this.options.find((option) => this.valid(option));
+      if (firstValidOption) {
+        const value = firstValidOption.value.value;
+        state.update({
+          [primaryStateName]: value,
+          [secondaryStateName]: value,
+        });
+      } else {
+        console.warn("No valid options available to initialize the Radio component.");
+      }
     }
   }
 
+  /**
+   * Generates the HTML template for the Radio component.
+   * @returns {HTMLElement}
+   */
   template() {
     const { state } = Globals;
-    const stateName = this.stateName.value;
-    const selected = this.selected.value;
-    const unselected = this.unselected.value;
+    const primaryStateName = this.primaryStateName.value;
+    const secondaryStateName = this.secondaryStateName.value;
     const radioLabel = this.label.value;
-    let currentValue = state.get(stateName);
+
+    // Initialize states if not already set
+    this.initializeStates();
+
+    const currentPrimary = state.get(primaryStateName);
+    const currentSecondary = state.get(secondaryStateName);
+
     const choices = this.options.map((choice, index) => {
       const choiceDisabled = !this.valid(choice);
       const choiceValue = choice.value.value;
       const choiceName = choice.name.value;
-      if (stateName && !currentValue && !choiceDisabled && choiceValue) {
-        currentValue = choiceValue;
-        state.define(stateName, choiceValue);
-      }
-      const color =
-        choiceValue == currentValue || (!currentValue && index == 0)
-          ? selected
-          : unselected;
+
+      // Determine if the current choice is selected in either state
+      const isSelectedPrimary = choiceValue === currentPrimary;
+      const isSelectedSecondary = choiceValue === currentSecondary;
+      const isSelected = isSelectedPrimary || isSelectedSecondary;
+      const color = isSelected
+        ? choice.selectedColor.value
+        : choice.unselectedColor.value;
+
       return html`<button
         style=${styleString({ backgroundColor: color })}
         value=${choiceValue}
         ?disabled=${choiceDisabled}
         data=${{
           ComponentType: this.className,
-          ComponentName: radioLabel || stateName,
+          ComponentName: radioLabel || primaryStateName,
           label: choiceName,
         }}
-        click
-        @Activate=${() => state.update({ [stateName]: choice.value.value })}
-      >
+        @click=${this.handleClick}
+       >
         ${choiceName}
       </button>`;
     });
 
     return this.component(
       {},
-      html`<fieldset class="flex">
-        ${(radioLabel && [html`<legend>${radioLabel}</legend>`]) || []}
+      html`<fieldset class="flex" role="radiogroup">
+        ${radioLabel ? html`<legend>${radioLabel}</legend>` : null}
         ${choices}
-      </fieldset>`,
+      </fieldset>`
     );
   }
 
+  /**
+   * Generates the settings UI for the Radio component.
+   * @returns {HTMLElement[]}
+   */
   settingsDetails() {
     const props = this.props;
-    const inputs = Object.values(props).map((prop) => prop.input());
+
+    // Exclude properties handled in specific fieldsets to prevent duplication
+    const excludedProps = new Set([
+      "primaryStateName",
+      "secondaryStateName",
+      "lastClickedStateName",
+      // Color properties are handled within each Option
+    ]);
+
+    // Include only props not in excludedProps
+    const generalInputs = Object.entries(props)
+      .filter(([key]) => !excludedProps.has(key))
+      .map(([, prop]) => prop.input());
+
     const filters = this.filterChildren(GridFilter);
-    const editFilters = !filters.length
-      ? []
-      : [GridFilter.FilterSettings(filters)];
+    const editFilters = filters.length
+      ? [GridFilter.FilterSettings(filters)]
+      : [];
+
     const options = this.filterChildren(Option$1);
     const editOptions = html`<fieldset>
       <legend>Options</legend>
@@ -13698,6 +17844,8 @@ class Radio extends TreeBase {
             <th>#</th>
             <th>Name</th>
             <th>Value</th>
+            <th>Selected Color</th>
+            <th>Unselected Color</th>
           </tr>
         </thead>
         <tbody>
@@ -13707,15 +17855,46 @@ class Radio extends TreeBase {
                 <td>${index + 1}</td>
                 <td>${option.name.input()}</td>
                 <td>${option.value.input()}</td>
+                <td>${option.selectedColor.input()}</td> <!-- No extra label -->
+                <td>${option.unselectedColor.input()}</td> <!-- No extra label -->
               </tr>
-            `,
+            `
           )}
         </tbody>
       </table>
     </fieldset>`;
-    return [html`<div>${editFilters}${editOptions}${inputs}</div>`];
+
+    // State Management Settings with Descriptive Labels
+    const stateSettings = html`<fieldset>
+      <legend>State Management</legend>
+      <label>
+        
+        ${this.primaryStateName.input()}
+      </label>
+      <label>
+        
+        ${this.secondaryStateName.input()}
+      </label>
+      <label>
+        
+        ${this.lastClickedStateName.input()}
+      </label>
+    </fieldset>`;
+
+    return [
+      html`<div>
+        ${editFilters}
+        ${editOptions}
+        ${stateSettings}
+        ${generalInputs}
+      </div>`,
+    ];
   }
 
+  /**
+   * Returns the children settings, currently empty.
+   * @returns {HTMLElement}
+   */
   settingsChildren() {
     return html`<div />`;
   }
@@ -14157,12 +18336,19 @@ class Button extends TreeBase {
 }
 TreeBase.register(Button, "Button");
 
+// Monitor.js
+
+
 class Monitor extends TreeBase {
   template() {
     const { state, actions: rules } = Globals;
     const stateKeys = [
       ...new Set([...Object.keys(state.values), ...accessed.keys()]),
     ].sort();
+
+    // Debugging: Log stateKeys
+    console.log("Rendering Monitor - State Keys:", stateKeys);
+
     const s = html`<table class="state">
       <thead>
         <tr>
@@ -14180,9 +18366,16 @@ class Monitor extends TreeBase {
             if (value.length > clamped.length) {
               clamped += "...";
             }
+
+            // Ensure clamped is always a string
+            clamped = String(clamped);
+
+            // Debugging: Log each state row
+            console.log(`State Key: ${key}, Value: ${clamped}`);
+
             return html`<tr
-              ?updated=${state.hasBeenUpdated(key)}
-              ?undefined=${accessed.get(key) === false}
+              ?updated=${Boolean(state.hasBeenUpdated(key))}
+              ?undefined=${Boolean(accessed.get(key) === false)}
             >
               <td>${key}</td>
               <td>${clamped}</td>
@@ -14198,6 +18391,10 @@ class Monitor extends TreeBase {
     const rowKeys = [
       ...new Set([...Object.keys(row), ...rowAccessedKeys]),
     ].sort();
+
+    // Debugging: Log rowKeys
+    console.log("Rendering Monitor - Row Keys:", rowKeys);
+
     const f = html`<table class="fields">
       <thead>
         <tr>
@@ -14208,12 +18405,17 @@ class Monitor extends TreeBase {
       <tbody>
         ${rowKeys.map((key) => {
           const value = row[key];
+          const displayValue = typeof value === "string" ? value : String(value || "");
+
+          // Debugging: Log each field row
+          console.log(`Field Key: ${key}, Value: ${displayValue}`);
+
           return html`<tr
-            ?undefined=${accessed.get(`_${key}`) === false}
-            ?accessed=${accessed.has(`_${key}`)}
+            ?undefined=${Boolean(accessed.get(`_${key}`) === false)}
+            ?accessed=${Boolean(accessed.has(`_${key}`))}
           >
             <td>#${key}</td>
-            <td>${value || ""}</td>
+            <td>${displayValue}</td>
           </tr>`;
         })}
       </tbody>
@@ -21313,6 +25515,7 @@ function requireSpeechConfig () {
 	    }
 	    requestWordLevelTimestamps() {
 	        this.privProperties.setProperty(Exports_js_2.PropertyId.SpeechServiceResponse_RequestWordLevelTimestamps, "true");
+	        this.privProperties.setProperty(Exports_js_1.OutputFormatPropertyName, Exports_js_2.OutputFormat[Exports_js_2.OutputFormat.Detailed]);
 	    }
 	    enableDictation() {
 	        this.privProperties.setProperty(Exports_js_1.ForceDictationPropertyName, "true");
@@ -22053,13 +26256,38 @@ var PropertyId = {};
 	     */
 	    PropertyId[PropertyId["Speech_SegmentationSilenceTimeoutMs"] = 32] = "Speech_SegmentationSilenceTimeoutMs";
 	    /**
+	     * SegmentationMaximumTimeMs represents the maximum length of a spoken phrase when using the Time segmentation strategy.
+	     * As the length of a spoken phrase approaches this value, the @member Speech_SegmentationSilenceTimeoutMs will be reduced until either
+	     * the phrase silence timeout is reached or the phrase reaches the maximum length.
+	     *
+	     * Added in version 1.42.0.
+	     */
+	    PropertyId[PropertyId["Speech_SegmentationMaximumTimeMs"] = 33] = "Speech_SegmentationMaximumTimeMs";
+	    /**
+	     * SegmentationStrategy defines the strategy used to determine when a spoken phrase has ended and a final Recognized result should be generated.
+	     * Allowed values are "Default", "Time", and "Semantic".
+	     *
+	     * Valid values:
+	     * - "Default": Uses the default strategy and settings as determined by the Speech Service. Suitable for most situations.
+	     * - "Time": Uses a time-based strategy where the amount of silence between speech determines when to generate a final result.
+	     * - "Semantic": Uses an AI model to determine the end of a spoken phrase based on the phrase's content.
+	     *
+	     * Additional Notes:
+	     * - When using the Time strategy, @member Speech_SegmentationSilenceTimeoutMs can be adjusted to modify the required silence duration for ending a phrase,
+	     * and @member Speech_SegmentationMaximumTimeMs can be adjusted to set the maximum length of a spoken phrase.
+	     * - The Semantic strategy does not have any adjustable properties.
+	     *
+	     * Added in version 1.42.0.
+	     */
+	    PropertyId[PropertyId["Speech_SegmentationStrategy"] = 34] = "Speech_SegmentationStrategy";
+	    /**
 	     * A boolean value specifying whether audio logging is enabled in the service or not.
 	     * Audio and content logs are stored either in Microsoft-owned storage, or in your own storage account linked
 	     * to your Cognitive Services subscription (Bring Your Own Storage (BYOS) enabled Speech resource).
 	     * The logs will be removed after 30 days.
 	     * Added in version 1.7.0
 	     */
-	    PropertyId[PropertyId["SpeechServiceConnection_EnableAudioLogging"] = 33] = "SpeechServiceConnection_EnableAudioLogging";
+	    PropertyId[PropertyId["SpeechServiceConnection_EnableAudioLogging"] = 35] = "SpeechServiceConnection_EnableAudioLogging";
 	    /**
 	     * The speech service connection language identifier mode.
 	     * Can be "AtStart" (the default), or "Continuous". See Language
@@ -22067,68 +26295,68 @@ var PropertyId = {};
 	     * for more details.
 	     * Added in 1.25.0
 	     **/
-	    PropertyId[PropertyId["SpeechServiceConnection_LanguageIdMode"] = 34] = "SpeechServiceConnection_LanguageIdMode";
+	    PropertyId[PropertyId["SpeechServiceConnection_LanguageIdMode"] = 36] = "SpeechServiceConnection_LanguageIdMode";
 	    /**
 	     * A string value representing the desired endpoint version to target for Speech Recognition.
 	     * Added in version 1.21.0
 	     */
-	    PropertyId[PropertyId["SpeechServiceConnection_RecognitionEndpointVersion"] = 35] = "SpeechServiceConnection_RecognitionEndpointVersion";
+	    PropertyId[PropertyId["SpeechServiceConnection_RecognitionEndpointVersion"] = 37] = "SpeechServiceConnection_RecognitionEndpointVersion";
 	    /**
 	    /**
 	     * A string value the current speaker recognition scenario/mode (TextIndependentIdentification, etc.).
 	     * Added in version 1.23.0
 	     */
-	    PropertyId[PropertyId["SpeechServiceConnection_SpeakerIdMode"] = 36] = "SpeechServiceConnection_SpeakerIdMode";
+	    PropertyId[PropertyId["SpeechServiceConnection_SpeakerIdMode"] = 38] = "SpeechServiceConnection_SpeakerIdMode";
 	    /**
 	     * The requested Cognitive Services Speech Service response output profanity setting.
 	     * Allowed values are "masked", "removed", and "raw".
 	     * Added in version 1.7.0.
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_ProfanityOption"] = 37] = "SpeechServiceResponse_ProfanityOption";
+	    PropertyId[PropertyId["SpeechServiceResponse_ProfanityOption"] = 39] = "SpeechServiceResponse_ProfanityOption";
 	    /**
 	     * A string value specifying which post processing option should be used by service.
 	     * Allowed values are "TrueText".
 	     * Added in version 1.7.0
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_PostProcessingOption"] = 38] = "SpeechServiceResponse_PostProcessingOption";
+	    PropertyId[PropertyId["SpeechServiceResponse_PostProcessingOption"] = 40] = "SpeechServiceResponse_PostProcessingOption";
 	    /**
 	     * A boolean value specifying whether to include word-level timestamps in the response result.
 	     * Added in version 1.7.0
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_RequestWordLevelTimestamps"] = 39] = "SpeechServiceResponse_RequestWordLevelTimestamps";
+	    PropertyId[PropertyId["SpeechServiceResponse_RequestWordLevelTimestamps"] = 41] = "SpeechServiceResponse_RequestWordLevelTimestamps";
 	    /**
 	     * The number of times a word has to be in partial results to be returned.
 	     * Added in version 1.7.0
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_StablePartialResultThreshold"] = 40] = "SpeechServiceResponse_StablePartialResultThreshold";
+	    PropertyId[PropertyId["SpeechServiceResponse_StablePartialResultThreshold"] = 42] = "SpeechServiceResponse_StablePartialResultThreshold";
 	    /**
 	     * A string value specifying the output format option in the response result. Internal use only.
 	     * Added in version 1.7.0.
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_OutputFormatOption"] = 41] = "SpeechServiceResponse_OutputFormatOption";
+	    PropertyId[PropertyId["SpeechServiceResponse_OutputFormatOption"] = 43] = "SpeechServiceResponse_OutputFormatOption";
 	    /**
 	     * A boolean value to request for stabilizing translation partial results by omitting words in the end.
 	     * Added in version 1.7.0.
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_TranslationRequestStablePartialResult"] = 42] = "SpeechServiceResponse_TranslationRequestStablePartialResult";
+	    PropertyId[PropertyId["SpeechServiceResponse_TranslationRequestStablePartialResult"] = 44] = "SpeechServiceResponse_TranslationRequestStablePartialResult";
 	    /**
 	     * A boolean value specifying whether to request WordBoundary events.
 	     * @member PropertyId.SpeechServiceResponse_RequestWordBoundary
 	     * Added in version 1.21.0.
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_RequestWordBoundary"] = 43] = "SpeechServiceResponse_RequestWordBoundary";
+	    PropertyId[PropertyId["SpeechServiceResponse_RequestWordBoundary"] = 45] = "SpeechServiceResponse_RequestWordBoundary";
 	    /**
 	     * A boolean value specifying whether to request punctuation boundary in WordBoundary Events. Default is true.
 	     * @member PropertyId.SpeechServiceResponse_RequestPunctuationBoundary
 	     * Added in version 1.21.0.
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_RequestPunctuationBoundary"] = 44] = "SpeechServiceResponse_RequestPunctuationBoundary";
+	    PropertyId[PropertyId["SpeechServiceResponse_RequestPunctuationBoundary"] = 46] = "SpeechServiceResponse_RequestPunctuationBoundary";
 	    /**
 	     * A boolean value specifying whether to request sentence boundary in WordBoundary Events. Default is false.
 	     * @member PropertyId.SpeechServiceResponse_RequestSentenceBoundary
 	     * Added in version 1.21.0.
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_RequestSentenceBoundary"] = 45] = "SpeechServiceResponse_RequestSentenceBoundary";
+	    PropertyId[PropertyId["SpeechServiceResponse_RequestSentenceBoundary"] = 47] = "SpeechServiceResponse_RequestSentenceBoundary";
 	    /**
 	     * Determines if intermediate results contain speaker identification.
 	     * Allowed values are "true" or "false". If set to "true", the intermediate results will contain speaker identification.
@@ -22137,80 +26365,80 @@ var PropertyId = {};
 	     * @member PropertyId.SpeechServiceResponse_DiarizeIntermediateResults
 	     * Adding in version 1.41.
 	     */
-	    PropertyId[PropertyId["SpeechServiceResponse_DiarizeIntermediateResults"] = 46] = "SpeechServiceResponse_DiarizeIntermediateResults";
+	    PropertyId[PropertyId["SpeechServiceResponse_DiarizeIntermediateResults"] = 48] = "SpeechServiceResponse_DiarizeIntermediateResults";
 	    /**
 	     * Identifier used to connect to the backend service.
 	     * @member PropertyId.Conversation_ApplicationId
 	     */
-	    PropertyId[PropertyId["Conversation_ApplicationId"] = 47] = "Conversation_ApplicationId";
+	    PropertyId[PropertyId["Conversation_ApplicationId"] = 49] = "Conversation_ApplicationId";
 	    /**
 	     * Type of dialog backend to connect to.
 	     * @member PropertyId.Conversation_DialogType
 	     */
-	    PropertyId[PropertyId["Conversation_DialogType"] = 48] = "Conversation_DialogType";
+	    PropertyId[PropertyId["Conversation_DialogType"] = 50] = "Conversation_DialogType";
 	    /**
 	     * Silence timeout for listening
 	     * @member PropertyId.Conversation_Initial_Silence_Timeout
 	     */
-	    PropertyId[PropertyId["Conversation_Initial_Silence_Timeout"] = 49] = "Conversation_Initial_Silence_Timeout";
+	    PropertyId[PropertyId["Conversation_Initial_Silence_Timeout"] = 51] = "Conversation_Initial_Silence_Timeout";
 	    /**
 	     * From Id to add to speech recognition activities.
 	     * @member PropertyId.Conversation_From_Id
 	     */
-	    PropertyId[PropertyId["Conversation_From_Id"] = 50] = "Conversation_From_Id";
+	    PropertyId[PropertyId["Conversation_From_Id"] = 52] = "Conversation_From_Id";
 	    /**
 	     * ConversationId for the session.
 	     * @member PropertyId.Conversation_Conversation_Id
 	     */
-	    PropertyId[PropertyId["Conversation_Conversation_Id"] = 51] = "Conversation_Conversation_Id";
+	    PropertyId[PropertyId["Conversation_Conversation_Id"] = 53] = "Conversation_Conversation_Id";
 	    /**
 	     * Comma separated list of custom voice deployment ids.
 	     * @member PropertyId.Conversation_Custom_Voice_Deployment_Ids
 	     */
-	    PropertyId[PropertyId["Conversation_Custom_Voice_Deployment_Ids"] = 52] = "Conversation_Custom_Voice_Deployment_Ids";
+	    PropertyId[PropertyId["Conversation_Custom_Voice_Deployment_Ids"] = 54] = "Conversation_Custom_Voice_Deployment_Ids";
 	    /**
 	     * Speech activity template, stamp properties from the template on the activity generated by the service for speech.
 	     * @member PropertyId.Conversation_Speech_Activity_Template
 	     * Added in version 1.10.0.
 	     */
-	    PropertyId[PropertyId["Conversation_Speech_Activity_Template"] = 53] = "Conversation_Speech_Activity_Template";
+	    PropertyId[PropertyId["Conversation_Speech_Activity_Template"] = 55] = "Conversation_Speech_Activity_Template";
 	    /**
 	     * Enables or disables the receipt of turn status messages as obtained on the turnStatusReceived event.
 	     * @member PropertyId.Conversation_Request_Bot_Status_Messages
 	     * Added in version 1.15.0.
 	     */
-	    PropertyId[PropertyId["Conversation_Request_Bot_Status_Messages"] = 54] = "Conversation_Request_Bot_Status_Messages";
+	    PropertyId[PropertyId["Conversation_Request_Bot_Status_Messages"] = 56] = "Conversation_Request_Bot_Status_Messages";
 	    /**
 	     * Specifies the connection ID to be provided in the Agent configuration message, e.g. a Direct Line token for
 	     * channel authentication.
 	     * Added in version 1.15.1.
 	     */
-	    PropertyId[PropertyId["Conversation_Agent_Connection_Id"] = 55] = "Conversation_Agent_Connection_Id";
+	    PropertyId[PropertyId["Conversation_Agent_Connection_Id"] = 57] = "Conversation_Agent_Connection_Id";
 	    /**
 	     * The Cognitive Services Speech Service host (url). Under normal circumstances, you shouldn't have to use this property directly.
 	     * Instead, use [[SpeechConfig.fromHost]].
 	     */
-	    PropertyId[PropertyId["SpeechServiceConnection_Host"] = 56] = "SpeechServiceConnection_Host";
+	    PropertyId[PropertyId["SpeechServiceConnection_Host"] = 58] = "SpeechServiceConnection_Host";
 	    /**
 	     * Set the host for service calls to the Conversation Translator REST management and websocket calls.
 	     */
-	    PropertyId[PropertyId["ConversationTranslator_Host"] = 57] = "ConversationTranslator_Host";
+	    PropertyId[PropertyId["ConversationTranslator_Host"] = 59] = "ConversationTranslator_Host";
 	    /**
 	     * Optionally set the the host's display name.
 	     * Used when joining a conversation.
 	     */
-	    PropertyId[PropertyId["ConversationTranslator_Name"] = 58] = "ConversationTranslator_Name";
+	    PropertyId[PropertyId["ConversationTranslator_Name"] = 60] = "ConversationTranslator_Name";
 	    /**
 	     * Optionally set a value for the X-CorrelationId request header.
 	     * Used for troubleshooting errors in the server logs. It should be a valid guid.
 	     */
-	    PropertyId[PropertyId["ConversationTranslator_CorrelationId"] = 59] = "ConversationTranslator_CorrelationId";
+	    PropertyId[PropertyId["ConversationTranslator_CorrelationId"] = 61] = "ConversationTranslator_CorrelationId";
 	    /**
 	     * Set the conversation token to be sent to the speech service. This enables the
 	     * service to service call from the speech service to the Conversation Translator service for relaying
 	     * recognitions. For internal use.
 	     */
-	    PropertyId[PropertyId["ConversationTranslator_Token"] = 60] = "ConversationTranslator_Token";
+	    PropertyId[PropertyId["ConversationTranslator_Token"] = 62] = "ConversationTranslator_Token";
 	    /**
 	     * The reference text of the audio for pronunciation evaluation.
 	     * For this and the following pronunciation assessment parameters, see
@@ -22218,19 +26446,19 @@ var PropertyId = {};
 	     * Under normal circumstances, you shouldn't have to use this property directly.
 	     * Added in version 1.15.0
 	     */
-	    PropertyId[PropertyId["PronunciationAssessment_ReferenceText"] = 61] = "PronunciationAssessment_ReferenceText";
+	    PropertyId[PropertyId["PronunciationAssessment_ReferenceText"] = 63] = "PronunciationAssessment_ReferenceText";
 	    /**
 	     * The point system for pronunciation score calibration (FivePoint or HundredMark).
 	     * Under normal circumstances, you shouldn't have to use this property directly.
 	     * Added in version 1.15.0
 	     */
-	    PropertyId[PropertyId["PronunciationAssessment_GradingSystem"] = 62] = "PronunciationAssessment_GradingSystem";
+	    PropertyId[PropertyId["PronunciationAssessment_GradingSystem"] = 64] = "PronunciationAssessment_GradingSystem";
 	    /**
 	     * The pronunciation evaluation granularity (Phoneme, Word, or FullText).
 	     * Under normal circumstances, you shouldn't have to use this property directly.
 	     * Added in version 1.15.0
 	     */
-	    PropertyId[PropertyId["PronunciationAssessment_Granularity"] = 63] = "PronunciationAssessment_Granularity";
+	    PropertyId[PropertyId["PronunciationAssessment_Granularity"] = 65] = "PronunciationAssessment_Granularity";
 	    /**
 	     * Defines if enable miscue calculation.
 	     * With this enabled, the pronounced words will be compared to the reference text,
@@ -22238,36 +26466,36 @@ var PropertyId = {};
 	     * Under normal circumstances, you shouldn't have to use this property directly.
 	     * Added in version 1.15.0
 	     */
-	    PropertyId[PropertyId["PronunciationAssessment_EnableMiscue"] = 64] = "PronunciationAssessment_EnableMiscue";
+	    PropertyId[PropertyId["PronunciationAssessment_EnableMiscue"] = 66] = "PronunciationAssessment_EnableMiscue";
 	    /**
 	     * The json string of pronunciation assessment parameters
 	     * Under normal circumstances, you shouldn't have to use this property directly.
 	     * Added in version 1.15.0
 	     */
-	    PropertyId[PropertyId["PronunciationAssessment_Json"] = 65] = "PronunciationAssessment_Json";
+	    PropertyId[PropertyId["PronunciationAssessment_Json"] = 67] = "PronunciationAssessment_Json";
 	    /**
 	     * Pronunciation assessment parameters.
 	     * This property is intended to be read-only. The SDK is using it internally.
 	     * Added in version 1.15.0
 	     */
-	    PropertyId[PropertyId["PronunciationAssessment_Params"] = 66] = "PronunciationAssessment_Params";
+	    PropertyId[PropertyId["PronunciationAssessment_Params"] = 68] = "PronunciationAssessment_Params";
 	    /**
 	     * Version of Speaker Recognition API to use.
 	     * Added in version 1.18.0
 	     */
-	    PropertyId[PropertyId["SpeakerRecognition_Api_Version"] = 67] = "SpeakerRecognition_Api_Version";
+	    PropertyId[PropertyId["SpeakerRecognition_Api_Version"] = 69] = "SpeakerRecognition_Api_Version";
 	    /**
 	     * Specifies whether to allow load of data URL for web worker
 	     * Allowed values are "off" and "on". Default is "on".
 	     * Added in version 1.32.0
 	     */
-	    PropertyId[PropertyId["WebWorkerLoadType"] = 68] = "WebWorkerLoadType";
+	    PropertyId[PropertyId["WebWorkerLoadType"] = 70] = "WebWorkerLoadType";
 	    /**
 	     * Talking avatar service WebRTC session description protocol.
 	     * This property is intended to be read-only. The SDK is using it internally.
 	     * Added in version 1.33.0
 	     */
-	    PropertyId[PropertyId["TalkingAvatarService_WebRTC_SDP"] = 69] = "TalkingAvatarService_WebRTC_SDP";
+	    PropertyId[PropertyId["TalkingAvatarService_WebRTC_SDP"] = 71] = "TalkingAvatarService_WebRTC_SDP";
 	})(exports.PropertyId || (exports.PropertyId = {}));
 
 	
@@ -23292,6 +27520,9 @@ function requireTranslationRecognizer () {
 	    static FromConfig(speechTranslationConfig, autoDetectSourceLanguageConfig, audioConfig) {
 	        const speechTranslationConfigImpl = speechTranslationConfig;
 	        autoDetectSourceLanguageConfig.properties.mergeTo(speechTranslationConfigImpl.properties);
+	        if (autoDetectSourceLanguageConfig.properties.getProperty(Exports_js_3.PropertyId.SpeechServiceConnection_AutoDetectSourceLanguages, undefined) === Exports_js_1.AutoDetectSourceLanguagesOpenRangeOptionName) {
+	            speechTranslationConfigImpl.properties.setProperty(Exports_js_3.PropertyId.SpeechServiceConnection_RecoLanguage, "en-US");
+	        }
 	        return new TranslationRecognizer(speechTranslationConfig, audioConfig);
 	    }
 	    /**
@@ -23623,7 +27854,7 @@ function requireNoMatchDetails () {
 	     * @returns {NoMatchDetails} The no match details object being created.
 	     */
 	    static fromResult(result) {
-	        const simpleSpeech = Exports_js_1.SimpleSpeechPhrase.fromJSON(result.json);
+	        const simpleSpeech = Exports_js_1.SimpleSpeechPhrase.fromJSON(result.json, 0); // Offset fixups are already done.
 	        let reason = Exports_js_2.NoMatchReason.NotRecognized;
 	        switch (simpleSpeech.RecognitionStatus) {
 	            case Exports_js_1.RecognitionStatus.BabbleTimeout:
@@ -23884,7 +28115,7 @@ function requireCancellationDetails () {
 	        let reason = Exports_js_2.CancellationReason.Error;
 	        let errorCode = Exports_js_2.CancellationErrorCode.NoError;
 	        if (result instanceof Exports_js_2.RecognitionResult && !!result.json) {
-	            const simpleSpeech = Exports_js_1.SimpleSpeechPhrase.fromJSON(result.json);
+	            const simpleSpeech = Exports_js_1.SimpleSpeechPhrase.fromJSON(result.json, 0); // Offset fixups are already done.
 	            reason = Exports_js_1.EnumTranslation.implTranslateCancelResult(simpleSpeech.RecognitionStatus);
 	        }
 	        if (!!result.properties) {
@@ -24482,6 +28713,8 @@ QueryParameterNames.EnableLanguageId = "lidEnabled";
 QueryParameterNames.EnableWordLevelTimestamps = "wordLevelTimestamps";
 QueryParameterNames.EndSilenceTimeoutMs = "endSilenceTimeoutMs";
 QueryParameterNames.SegmentationSilenceTimeoutMs = "segmentationSilenceTimeoutMs";
+QueryParameterNames.SegmentationMaximumTimeMs = "segmentationMaximumTimeMs";
+QueryParameterNames.SegmentationStrategy = "segmentationStrategy";
 QueryParameterNames.Format = "format";
 QueryParameterNames.InitialSilenceTimeoutMs = "initialSilenceTimeoutMs";
 QueryParameterNames.Language = "language";
@@ -25934,10 +30167,10 @@ function requireAutoDetectSourceLanguageConfig () {
 	     * @member AutoDetectSourceLanguageConfig.fromOpenRange
 	     * @function
 	     * @public
-	     * Only [[SpeechSynthesizer]] supports source language auto detection from open range,
-	     * for [[Recognizer]], please use AutoDetectSourceLanguageConfig with specific source languages.
 	     * @return {AutoDetectSourceLanguageConfig} Instance of AutoDetectSourceLanguageConfig
 	     * @summary Creates an instance of the AutoDetectSourceLanguageConfig with open range.
+	     * Only [[SpeechSynthesizer]] supports source language auto detection from open range,
+	     * for [[Recognizer]], please use AutoDetectSourceLanguageConfig with specific source languages.
 	     */
 	    static fromOpenRange() {
 	        const config = new AutoDetectSourceLanguageConfig();
@@ -30472,15 +34705,39 @@ var VoiceInfo = {};
 	})(SynthesisVoiceGender = exports.SynthesisVoiceGender || (exports.SynthesisVoiceGender = {}));
 	var SynthesisVoiceType;
 	(function (SynthesisVoiceType) {
+	    /**
+	     * Voice type is not known.
+	     */
+	    SynthesisVoiceType[SynthesisVoiceType["Unknown"] = 0] = "Unknown";
+	    /**
+	     * Online neural voices.
+	     */
 	    SynthesisVoiceType[SynthesisVoiceType["OnlineNeural"] = 1] = "OnlineNeural";
+	    /**
+	     * Online standard voices. These voices are deprecated.
+	     */
 	    SynthesisVoiceType[SynthesisVoiceType["OnlineStandard"] = 2] = "OnlineStandard";
+	    /**
+	     * Offline neural voices.
+	     */
 	    SynthesisVoiceType[SynthesisVoiceType["OfflineNeural"] = 3] = "OfflineNeural";
+	    /**
+	     * Offline standard voices.
+	     */
 	    SynthesisVoiceType[SynthesisVoiceType["OfflineStandard"] = 4] = "OfflineStandard";
+	    /**
+	     * High definition (HD) voices. Refer to https://learn.microsoft.com/azure/ai-services/speech-service/high-definition-voices
+	     */
+	    SynthesisVoiceType[SynthesisVoiceType["OnlineNeuralHD"] = 5] = "OnlineNeuralHD";
 	})(SynthesisVoiceType = exports.SynthesisVoiceType || (exports.SynthesisVoiceType = {}));
 	const GENDER_LOOKUP = {
 	    [SynthesisVoiceGender[SynthesisVoiceGender.Neutral]]: SynthesisVoiceGender.Neutral,
 	    [SynthesisVoiceGender[SynthesisVoiceGender.Male]]: SynthesisVoiceGender.Male,
 	    [SynthesisVoiceGender[SynthesisVoiceGender.Female]]: SynthesisVoiceGender.Female,
+	};
+	const VOICE_TYPE_LOOKUP = {
+	    Neural: SynthesisVoiceType.OnlineNeural,
+	    NeuralHD: SynthesisVoiceType.OnlineNeuralHD,
 	};
 	/**
 	 * Information about Speech Synthesis voice
@@ -30497,7 +34754,7 @@ var VoiceInfo = {};
 	            this.privLocaleName = json.LocaleName;
 	            this.privDisplayName = json.DisplayName;
 	            this.privLocalName = json.LocalName;
-	            this.privVoiceType = json.VoiceType.endsWith("Standard") ? SynthesisVoiceType.OnlineStandard : SynthesisVoiceType.OnlineNeural;
+	            this.privVoiceType = VOICE_TYPE_LOOKUP[json.VoiceType] || SynthesisVoiceType.Unknown;
 	            this.privGender = GENDER_LOOKUP[json.Gender] || SynthesisVoiceGender.Unknown;
 	            if (!!json.StyleList && Array.isArray(json.StyleList)) {
 	                for (const style of json.StyleList) {
@@ -30516,6 +34773,9 @@ var VoiceInfo = {};
 	            }
 	            if (Array.isArray(json.RolePlayList)) {
 	                this.privRolePlayList = [...json.RolePlayList];
+	            }
+	            if (json.VoiceTag) {
+	                this.privVoiceTag = json.VoiceTag;
 	            }
 	        }
 	    }
@@ -30564,6 +34824,9 @@ var VoiceInfo = {};
 	    }
 	    get rolePlayList() {
 	        return this.privRolePlayList;
+	    }
+	    get voiceTag() {
+	        return this.privVoiceTag;
 	    }
 	}
 	exports.VoiceInfo = VoiceInfo;
@@ -31325,6 +35588,7 @@ function requireAvatarConfig () {
 	     */
 	    constructor(character, style, videoFormat) {
 	        this.privCustomized = false;
+	        this.privUseBuiltInVoice = false;
 	        Contracts_js_1.Contracts.throwIfNullOrWhitespace(character, "character");
 	        this.character = character;
 	        this.style = style;
@@ -31344,6 +35608,18 @@ function requireAvatarConfig () {
 	     */
 	    set customized(value) {
 	        this.privCustomized = value;
+	    }
+	    /**
+	     * Indicates whether to use built-in voice for custom avatar.
+	     */
+	    get useBuiltInVoice() {
+	        return this.privUseBuiltInVoice;
+	    }
+	    /**
+	     * Sets whether to use built-in voice for custom avatar.
+	     */
+	    set useBuiltInVoice(value) {
+	        this.privUseBuiltInVoice = value;
 	    }
 	    /**
 	     * Gets the background color.
@@ -32064,6 +36340,8 @@ function requireExports$3 () {
 		var SynthesisVoicesResult_js_1 = requireSynthesisVoicesResult();
 		Object.defineProperty(exports, "SynthesisVoicesResult", { enumerable: true, get: function () { return SynthesisVoicesResult_js_1.SynthesisVoicesResult; } });
 		var VoiceInfo_js_1 = VoiceInfo;
+		Object.defineProperty(exports, "SynthesisVoiceGender", { enumerable: true, get: function () { return VoiceInfo_js_1.SynthesisVoiceGender; } });
+		Object.defineProperty(exports, "SynthesisVoiceType", { enumerable: true, get: function () { return VoiceInfo_js_1.SynthesisVoiceType; } });
 		Object.defineProperty(exports, "VoiceInfo", { enumerable: true, get: function () { return VoiceInfo_js_1.VoiceInfo; } });
 		var SpeakerAudioDestination_js_1 = SpeakerAudioDestination$1;
 		Object.defineProperty(exports, "SpeakerAudioDestination", { enumerable: true, get: function () { return SpeakerAudioDestination_js_1.SpeakerAudioDestination; } });
@@ -32978,19 +37256,48 @@ function requireServiceRecognizerBase () {
 	        }
 	    }
 	    setSpeechSegmentationTimeoutJson() {
-	        const speechSegmentationTimeout = this.privRecognizerConfig.parameters.getProperty(Exports_js_3.PropertyId.Speech_SegmentationSilenceTimeoutMs, undefined);
-	        if (speechSegmentationTimeout !== undefined) {
-	            const mode = this.recognitionMode === Exports_js_4.RecognitionMode.Conversation ? "CONVERSATION" :
+	        const speechSegmentationSilenceTimeoutMs = this.privRecognizerConfig.parameters.getProperty(Exports_js_3.PropertyId.Speech_SegmentationSilenceTimeoutMs, undefined);
+	        const speechSegmentationMaximumTimeMs = this.privRecognizerConfig.parameters.getProperty(Exports_js_3.PropertyId.Speech_SegmentationMaximumTimeMs, undefined);
+	        const speechSegmentationStrategy = this.privRecognizerConfig.parameters.getProperty(Exports_js_3.PropertyId.Speech_SegmentationStrategy, undefined);
+	        const segmentation = {
+	            segmentation: {
+	                mode: ""
+	            }
+	        };
+	        let configuredSegment = false;
+	        if (speechSegmentationStrategy !== undefined) {
+	            configuredSegment = true;
+	            let segMode = "";
+	            switch (speechSegmentationStrategy.toLowerCase()) {
+	                case "default":
+	                    break;
+	                case "time":
+	                    segMode = "Custom";
+	                    break;
+	                case "semantic":
+	                    segMode = "Semantic";
+	                    break;
+	            }
+	            segmentation.segmentation.mode = segMode;
+	        }
+	        if (speechSegmentationSilenceTimeoutMs !== undefined) {
+	            configuredSegment = true;
+	            const segmentationSilenceTimeoutMs = parseInt(speechSegmentationSilenceTimeoutMs, 10);
+	            segmentation.segmentation.mode = "Custom";
+	            segmentation.segmentation.segmentationSilenceTimeoutMs = segmentationSilenceTimeoutMs;
+	        }
+	        if (speechSegmentationMaximumTimeMs !== undefined) {
+	            configuredSegment = true;
+	            const segmentationMaximumTimeMs = parseInt(speechSegmentationMaximumTimeMs, 10);
+	            segmentation.segmentation.mode = "Custom";
+	            segmentation.segmentation.segmentationForcedTimeoutMs = segmentationMaximumTimeMs;
+	        }
+	        if (configuredSegment) {
+	            const recoMode = this.recognitionMode === Exports_js_4.RecognitionMode.Conversation ? "CONVERSATION" :
 	                this.recognitionMode === Exports_js_4.RecognitionMode.Dictation ? "DICTATION" : "INTERACTIVE";
-	            const segmentationSilenceTimeoutMs = parseInt(speechSegmentationTimeout, 10);
 	            const phraseDetection = this.privSpeechContext.getSection("phraseDetection");
-	            phraseDetection.mode = mode;
-	            phraseDetection[mode] = {
-	                segmentation: {
-	                    mode: "Custom",
-	                    segmentationSilenceTimeoutMs
-	                }
-	            };
+	            phraseDetection.mode = recoMode;
+	            phraseDetection[recoMode] = segmentation;
 	            this.privSpeechContext.setSection("phraseDetection", phraseDetection);
 	        }
 	    }
@@ -33275,7 +37582,7 @@ function requireServiceRecognizerBase () {
 	                        this.privRequestSession.onServiceTurnStartResponse();
 	                        break;
 	                    case "speech.startdetected":
-	                        const speechStartDetected = Exports_js_4.SpeechDetected.fromJSON(connectionMessage.textBody);
+	                        const speechStartDetected = Exports_js_4.SpeechDetected.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
 	                        const speechStartEventArgs = new Exports_js_3.RecognitionEventArgs(speechStartDetected.Offset, this.privRequestSession.sessionId);
 	                        if (!!this.privRecognizer.speechStartDetected) {
 	                            this.privRecognizer.speechStartDetected(this.privRecognizer, speechStartEventArgs);
@@ -33290,7 +37597,7 @@ function requireServiceRecognizerBase () {
 	                            // If the request was empty, the JSON returned is empty.
 	                            json = "{ Offset: 0 }";
 	                        }
-	                        const speechStopDetected = Exports_js_4.SpeechDetected.fromJSON(json);
+	                        const speechStopDetected = Exports_js_4.SpeechDetected.fromJSON(json, this.privRequestSession.currentTurnAudioOffset);
 	                        const speechStopEventArgs = new Exports_js_3.RecognitionEventArgs(speechStopDetected.Offset + this.privRequestSession.currentTurnAudioOffset, this.privRequestSession.sessionId);
 	                        if (!!this.privRecognizer.speechEndDetected) {
 	                            this.privRecognizer.speechEndDetected(this.privRecognizer, speechStopEventArgs);
@@ -33642,42 +37949,36 @@ function requireConversationServiceRecognizer () {
 	    cancelRecognition(sessionId, requestId, cancellationReason, errorCode, error) {
 	    }
 	    async handleSpeechPhrase(textBody) {
-	        const simple = Exports_js_2.SimpleSpeechPhrase.fromJSON(textBody);
+	        const simple = Exports_js_2.SimpleSpeechPhrase.fromJSON(textBody, this.privRequestSession.currentTurnAudioOffset);
 	        const resultReason = Exports_js_2.EnumTranslation.implTranslateRecognitionResult(simple.RecognitionStatus);
 	        let result;
 	        const resultProps = new Exports_js_1.PropertyCollection();
 	        resultProps.setProperty(Exports_js_1.PropertyId.SpeechServiceResponse_JsonResult, textBody);
-	        const simpleOffset = simple.Offset + this.privRequestSession.currentTurnAudioOffset;
-	        let offset = simpleOffset;
-	        this.privRequestSession.onPhraseRecognized(this.privRequestSession.currentTurnAudioOffset + simple.Offset + simple.Duration);
+	        this.privRequestSession.onPhraseRecognized(simple.Offset + simple.Duration);
 	        if (Exports_js_1.ResultReason.Canceled === resultReason) {
 	            const cancelReason = Exports_js_2.EnumTranslation.implTranslateCancelResult(simple.RecognitionStatus);
 	            const cancellationErrorCode = Exports_js_2.EnumTranslation.implTranslateCancelErrorCode(simple.RecognitionStatus);
 	            await this.cancelRecognitionLocal(cancelReason, cancellationErrorCode, Exports_js_2.EnumTranslation.implTranslateErrorDetails(cancellationErrorCode));
 	        }
 	        else {
-	            if (!(this.privRequestSession.isSpeechEnded && resultReason === Exports_js_1.ResultReason.NoMatch && simple.RecognitionStatus !== Exports_js_2.RecognitionStatus.InitialSilenceTimeout)) {
+	            if (simple.RecognitionStatus !== Exports_js_2.RecognitionStatus.EndOfDictation) {
 	                if (this.privRecognizerConfig.parameters.getProperty(Exports_js_2.OutputFormatPropertyName) === Exports_js_1.OutputFormat[Exports_js_1.OutputFormat.Simple]) {
-	                    result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, simple.DisplayText, simple.Duration, simpleOffset, simple.Language, simple.LanguageDetectionConfidence, simple.SpeakerId, undefined, textBody, resultProps);
+	                    result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, simple.DisplayText, simple.Duration, simple.Offset, simple.Language, simple.LanguageDetectionConfidence, simple.SpeakerId, undefined, simple.asJson(), resultProps);
 	                }
 	                else {
-	                    const detailed = Exports_js_2.DetailedSpeechPhrase.fromJSON(textBody);
-	                    const totalOffset = detailed.Offset + this.privRequestSession.currentTurnAudioOffset;
-	                    const offsetCorrectedJson = detailed.getJsonWithCorrectedOffsets(totalOffset);
-	                    result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, detailed.Text, detailed.Duration, totalOffset, detailed.Language, detailed.LanguageDetectionConfidence, detailed.SpeakerId, undefined, offsetCorrectedJson, resultProps);
-	                    offset = result.offset;
+	                    const detailed = Exports_js_2.DetailedSpeechPhrase.fromJSON(textBody, this.privRequestSession.currentTurnAudioOffset);
+	                    result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, detailed.Text, detailed.Duration, detailed.Offset, detailed.Language, detailed.LanguageDetectionConfidence, detailed.SpeakerId, undefined, detailed.asJson(), resultProps);
 	                }
-	                this.handleRecognizedCallback(result, offset, this.privRequestSession.sessionId);
+	                this.handleRecognizedCallback(result, result.offset, this.privRequestSession.sessionId);
 	            }
 	        }
 	    }
 	    handleSpeechHypothesis(textBody) {
-	        const hypothesis = Exports_js_2.SpeechHypothesis.fromJSON(textBody);
-	        const offset = hypothesis.Offset + this.privRequestSession.currentTurnAudioOffset;
+	        const hypothesis = Exports_js_2.SpeechHypothesis.fromJSON(textBody, this.privRequestSession.currentTurnAudioOffset);
 	        const resultProps = new Exports_js_1.PropertyCollection();
 	        resultProps.setProperty(Exports_js_1.PropertyId.SpeechServiceResponse_JsonResult, textBody);
-	        const result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, Exports_js_1.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, hypothesis.SpeakerId, undefined, textBody, resultProps);
-	        this.privRequestSession.onHypothesis(offset);
+	        const result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, Exports_js_1.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, hypothesis.Offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, hypothesis.SpeakerId, undefined, hypothesis.asJson(), resultProps);
+	        this.privRequestSession.onHypothesis(hypothesis.Offset);
 	        this.handleRecognizingCallback(result, hypothesis.Duration, this.privRequestSession.sessionId);
 	    }
 	};
@@ -34427,19 +38728,20 @@ TranslationHypothesis$1.TranslationHypothesis = void 0;
 const Contracts_js_1 = Contracts$1;
 const TranslationStatus_js_1 = TranslationStatus;
 class TranslationHypothesis {
-    constructor(hypothesis) {
+    constructor(hypothesis, baseOffset) {
         this.privTranslationHypothesis = hypothesis;
-        this.privTranslationHypothesis.Translation.TranslationStatus = TranslationStatus_js_1.TranslationStatus[this.privTranslationHypothesis.Translation.TranslationStatus];
+        this.privTranslationHypothesis.Offset += baseOffset;
+        this.privTranslationHypothesis.Translation.TranslationStatus = this.mapTranslationStatus(this.privTranslationHypothesis.Translation.TranslationStatus);
     }
-    static fromJSON(json) {
-        return new TranslationHypothesis(JSON.parse(json));
+    static fromJSON(json, baseOffset) {
+        return new TranslationHypothesis(JSON.parse(json), baseOffset);
     }
-    static fromTranslationResponse(translationHypothesis) {
+    static fromTranslationResponse(translationHypothesis, baseOffset) {
         Contracts_js_1.Contracts.throwIfNullOrUndefined(translationHypothesis, "translationHypothesis");
         const hypothesis = translationHypothesis.SpeechHypothesis;
         translationHypothesis.SpeechHypothesis = undefined;
         hypothesis.Translation = translationHypothesis;
-        return new TranslationHypothesis(hypothesis);
+        return new TranslationHypothesis(hypothesis, baseOffset);
     }
     get Duration() {
         return this.privTranslationHypothesis.Duration;
@@ -34455,6 +38757,22 @@ class TranslationHypothesis {
     }
     get Language() {
         return this.privTranslationHypothesis.PrimaryLanguage?.Language;
+    }
+    asJson() {
+        const jsonObj = { ...this.privTranslationHypothesis };
+        // Convert the enum value to its string representation for serialization purposes.
+        return jsonObj.Translation !== undefined ? JSON.stringify({
+            ...jsonObj,
+            TranslationStatus: TranslationStatus_js_1.TranslationStatus[jsonObj.Translation.TranslationStatus]
+        }) : JSON.stringify(jsonObj);
+    }
+    mapTranslationStatus(status) {
+        if (typeof status === "string") {
+            return TranslationStatus_js_1.TranslationStatus[status];
+        }
+        else if (typeof status === "number") {
+            return status;
+        }
     }
 }
 TranslationHypothesis$1.TranslationHypothesis = TranslationHypothesis;
@@ -34474,23 +38792,24 @@ function requireTranslationPhrase () {
 	const Exports_js_1 = requireExports();
 	const TranslationStatus_js_1 = TranslationStatus;
 	let TranslationPhrase$1 = class TranslationPhrase {
-	    constructor(phrase) {
+	    constructor(phrase, baseOffset) {
 	        this.privTranslationPhrase = phrase;
-	        this.privTranslationPhrase.RecognitionStatus = Exports_js_1.RecognitionStatus[this.privTranslationPhrase.RecognitionStatus];
+	        this.privTranslationPhrase.Offset += baseOffset;
+	        this.privTranslationPhrase.RecognitionStatus = this.mapRecognitionStatus(this.privTranslationPhrase.RecognitionStatus);
 	        if (this.privTranslationPhrase.Translation !== undefined) {
-	            this.privTranslationPhrase.Translation.TranslationStatus = TranslationStatus_js_1.TranslationStatus[this.privTranslationPhrase.Translation.TranslationStatus];
+	            this.privTranslationPhrase.Translation.TranslationStatus = this.mapTranslationStatus(this.privTranslationPhrase.Translation.TranslationStatus);
 	        }
 	    }
-	    static fromJSON(json) {
-	        return new TranslationPhrase(JSON.parse(json));
+	    static fromJSON(json, baseOffset) {
+	        return new TranslationPhrase(JSON.parse(json), baseOffset);
 	    }
-	    static fromTranslationResponse(translationResponse) {
+	    static fromTranslationResponse(translationResponse, baseOffset) {
 	        Contracts_js_1.Contracts.throwIfNullOrUndefined(translationResponse, "translationResponse");
 	        const phrase = translationResponse.SpeechPhrase;
 	        translationResponse.SpeechPhrase = undefined;
 	        phrase.Translation = translationResponse;
 	        phrase.Text = phrase.DisplayText;
-	        return new TranslationPhrase(phrase);
+	        return new TranslationPhrase(phrase, baseOffset);
 	    }
 	    get RecognitionStatus() {
 	        return this.privTranslationPhrase.RecognitionStatus;
@@ -34512,6 +38831,38 @@ function requireTranslationPhrase () {
 	    }
 	    get Translation() {
 	        return this.privTranslationPhrase.Translation;
+	    }
+	    asJson() {
+	        const jsonObj = { ...this.privTranslationPhrase };
+	        // Convert the enum values to their string representations for serialization
+	        const serializedObj = {
+	            ...jsonObj,
+	            RecognitionStatus: Exports_js_1.RecognitionStatus[jsonObj.RecognitionStatus]
+	        };
+	        if (jsonObj.Translation) {
+	            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+	            serializedObj.Translation = {
+	                ...jsonObj.Translation,
+	                TranslationStatus: TranslationStatus_js_1.TranslationStatus[jsonObj.Translation.TranslationStatus]
+	            };
+	        }
+	        return JSON.stringify(serializedObj);
+	    }
+	    mapRecognitionStatus(status) {
+	        if (typeof status === "string") {
+	            return Exports_js_1.RecognitionStatus[status];
+	        }
+	        else if (typeof status === "number") {
+	            return status;
+	        }
+	    }
+	    mapTranslationStatus(status) {
+	        if (typeof status === "string") {
+	            return TranslationStatus_js_1.TranslationStatus[status];
+	        }
+	        else if (typeof status === "number") {
+	            return status;
+	        }
 	    }
 	};
 	TranslationPhrase.TranslationPhrase = TranslationPhrase$1;
@@ -34552,7 +38903,8 @@ function requireTranslationServiceRecognizer () {
 	            return true;
 	        }
 	        const handleTranslationPhrase = async (translatedPhrase) => {
-	            this.privRequestSession.onPhraseRecognized(this.privRequestSession.currentTurnAudioOffset + translatedPhrase.Offset + translatedPhrase.Duration);
+	            resultProps.setProperty(Exports_js_2.PropertyId.SpeechServiceResponse_JsonResult, translatedPhrase.asJson());
+	            this.privRequestSession.onPhraseRecognized(translatedPhrase.Offset + translatedPhrase.Duration);
 	            if (translatedPhrase.RecognitionStatus === Exports_js_3.RecognitionStatus.Success) {
 	                // OK, the recognition was successful. How'd the translation do?
 	                const result = this.fireEventForResult(translatedPhrase, resultProps);
@@ -34585,14 +38937,14 @@ function requireTranslationServiceRecognizer () {
 	            }
 	            else {
 	                const reason = Exports_js_3.EnumTranslation.implTranslateRecognitionResult(translatedPhrase.RecognitionStatus);
-	                const result = new Exports_js_2.TranslationRecognitionResult(undefined, this.privRequestSession.requestId, reason, translatedPhrase.Text, translatedPhrase.Duration, this.privRequestSession.currentTurnAudioOffset + translatedPhrase.Offset, translatedPhrase.Language, translatedPhrase.Confidence, undefined, connectionMessage.textBody, resultProps);
+	                const result = new Exports_js_2.TranslationRecognitionResult(undefined, this.privRequestSession.requestId, reason, translatedPhrase.Text, translatedPhrase.Duration, translatedPhrase.Offset, translatedPhrase.Language, translatedPhrase.Confidence, undefined, translatedPhrase.asJson(), resultProps);
 	                if (reason === Exports_js_2.ResultReason.Canceled) {
 	                    const cancelReason = Exports_js_3.EnumTranslation.implTranslateCancelResult(translatedPhrase.RecognitionStatus);
 	                    const cancellationErrorCode = Exports_js_3.EnumTranslation.implTranslateCancelErrorCode(translatedPhrase.RecognitionStatus);
 	                    await this.cancelRecognitionLocal(cancelReason, cancellationErrorCode, Exports_js_3.EnumTranslation.implTranslateErrorDetails(cancellationErrorCode));
 	                }
 	                else {
-	                    if (!(this.privRequestSession.isSpeechEnded && reason === Exports_js_2.ResultReason.NoMatch && translatedPhrase.RecognitionStatus !== Exports_js_3.RecognitionStatus.InitialSilenceTimeout)) {
+	                    if (translatedPhrase.RecognitionStatus !== Exports_js_3.RecognitionStatus.EndOfDictation) {
 	                        const ev = new Exports_js_2.TranslationRecognitionEventArgs(result, result.offset, this.privRequestSession.sessionId);
 	                        if (!!this.privTranslationRecognizer.recognized) {
 	                            try {
@@ -34604,30 +38956,31 @@ function requireTranslationServiceRecognizer () {
 	                                // trip things up.
 	                            }
 	                        }
-	                    }
-	                    // report result to promise.
-	                    if (!!this.privSuccessCallback) {
-	                        try {
-	                            this.privSuccessCallback(result);
-	                        }
-	                        catch (e) {
-	                            if (!!this.privErrorCallback) {
-	                                this.privErrorCallback(e);
+	                        // report result to promise.
+	                        if (!!this.privSuccessCallback) {
+	                            try {
+	                                this.privSuccessCallback(result);
 	                            }
+	                            catch (e) {
+	                                if (!!this.privErrorCallback) {
+	                                    this.privErrorCallback(e);
+	                                }
+	                            }
+	                            // Only invoke the call back once.
+	                            // and if it's successful don't invoke the
+	                            // error after that.
+	                            this.privSuccessCallback = undefined;
+	                            this.privErrorCallback = undefined;
 	                        }
-	                        // Only invoke the call back once.
-	                        // and if it's successful don't invoke the
-	                        // error after that.
-	                        this.privSuccessCallback = undefined;
-	                        this.privErrorCallback = undefined;
 	                    }
 	                }
 	                processed = true;
 	            }
 	        };
-	        const handleTranslationHypothesis = (hypothesis, resultProperties) => {
-	            const result = this.fireEventForResult(hypothesis, resultProperties);
-	            this.privRequestSession.onHypothesis(this.privRequestSession.currentTurnAudioOffset + result.offset);
+	        const handleTranslationHypothesis = (hypothesis) => {
+	            resultProps.setProperty(Exports_js_2.PropertyId.SpeechServiceResponse_JsonResult, hypothesis.asJson());
+	            const result = this.fireEventForResult(hypothesis, resultProps);
+	            this.privRequestSession.onHypothesis(result.offset);
 	            if (!!this.privTranslationRecognizer.recognizing) {
 	                try {
 	                    this.privTranslationRecognizer.recognizing(this.privTranslationRecognizer, result);
@@ -34645,22 +38998,22 @@ function requireTranslationServiceRecognizer () {
 	        }
 	        switch (connectionMessage.path.toLowerCase()) {
 	            case "translation.hypothesis":
-	                handleTranslationHypothesis(Exports_js_3.TranslationHypothesis.fromJSON(connectionMessage.textBody), resultProps);
+	                handleTranslationHypothesis(Exports_js_3.TranslationHypothesis.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset));
 	                break;
 	            case "translation.response":
 	                const phrase = JSON.parse(connectionMessage.textBody);
 	                if (!!phrase.SpeechPhrase) {
-	                    await handleTranslationPhrase(Exports_js_3.TranslationPhrase.fromTranslationResponse(phrase));
+	                    await handleTranslationPhrase(Exports_js_3.TranslationPhrase.fromTranslationResponse(phrase, this.privRequestSession.currentTurnAudioOffset));
 	                }
 	                else {
 	                    const hypothesis = JSON.parse(connectionMessage.textBody);
 	                    if (!!hypothesis.SpeechHypothesis) {
-	                        handleTranslationHypothesis(Exports_js_3.TranslationHypothesis.fromTranslationResponse(hypothesis), resultProps);
+	                        handleTranslationHypothesis(Exports_js_3.TranslationHypothesis.fromTranslationResponse(hypothesis, this.privRequestSession.currentTurnAudioOffset));
 	                    }
 	                }
 	                break;
 	            case "translation.phrase":
-	                await handleTranslationPhrase(Exports_js_3.TranslationPhrase.fromJSON(connectionMessage.textBody));
+	                await handleTranslationPhrase(Exports_js_3.TranslationPhrase.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset));
 	                break;
 	            case "translation.synthesis":
 	                this.sendSynthesisAudio(connectionMessage.binaryBody, this.privRequestSession.sessionId);
@@ -34734,9 +39087,9 @@ function requireTranslationServiceRecognizer () {
 	            catch { }
 	        }
 	    }
-	    handleRecognizingCallback(result, duration, sessionId) {
+	    handleRecognizingCallback(result, offset, sessionId) {
 	        try {
-	            const ev = new Exports_js_2.TranslationRecognitionEventArgs(Exports_js_2.TranslationRecognitionResult.fromSpeechRecognitionResult(result), duration, sessionId);
+	            const ev = new Exports_js_2.TranslationRecognitionEventArgs(Exports_js_2.TranslationRecognitionResult.fromSpeechRecognitionResult(result), offset, sessionId);
 	            this.privTranslationRecognizer.recognizing(this.privTranslationRecognizer, ev);
 	            /* eslint-disable no-empty */
 	        }
@@ -34778,9 +39131,8 @@ function requireTranslationServiceRecognizer () {
 	            resultReason = Exports_js_2.ResultReason.TranslatingSpeech;
 	        }
 	        const language = serviceResult.Language;
-	        const offset = serviceResult.Offset + this.privRequestSession.currentTurnAudioOffset;
-	        const result = new Exports_js_2.TranslationRecognitionResult(translations, this.privRequestSession.requestId, resultReason, serviceResult.Text, serviceResult.Duration, offset, language, confidence, serviceResult.Translation.FailureReason, JSON.stringify(serviceResult), properties);
-	        const ev = new Exports_js_2.TranslationRecognitionEventArgs(result, offset, this.privRequestSession.sessionId);
+	        const result = new Exports_js_2.TranslationRecognitionResult(translations, this.privRequestSession.requestId, resultReason, serviceResult.Text, serviceResult.Duration, serviceResult.Offset, language, confidence, serviceResult.Translation.FailureReason, serviceResult.asJson(), properties);
+	        const ev = new Exports_js_2.TranslationRecognitionEventArgs(result, serviceResult.Offset, this.privRequestSession.sessionId);
 	        return ev;
 	    }
 	    sendSynthesisAudio(audio, sessionId) {
@@ -34812,11 +39164,12 @@ var SpeechDetected$1 = {};
 Object.defineProperty(SpeechDetected$1, "__esModule", { value: true });
 SpeechDetected$1.SpeechDetected = void 0;
 class SpeechDetected {
-    constructor(json) {
+    constructor(json, baseOffset) {
         this.privSpeechStartDetected = JSON.parse(json);
+        this.privSpeechStartDetected.Offset += baseOffset;
     }
-    static fromJSON(json) {
-        return new SpeechDetected(json);
+    static fromJSON(json, baseOffset) {
+        return new SpeechDetected(json, baseOffset);
     }
     get Offset() {
         return this.privSpeechStartDetected.Offset;
@@ -34831,11 +39184,18 @@ var SpeechHypothesis$1 = {};
 Object.defineProperty(SpeechHypothesis$1, "__esModule", { value: true });
 SpeechHypothesis$1.SpeechHypothesis = void 0;
 class SpeechHypothesis {
-    constructor(json) {
+    constructor(json, baseOffset) {
         this.privSpeechHypothesis = JSON.parse(json);
+        this.updateOffset(baseOffset);
     }
-    static fromJSON(json) {
-        return new SpeechHypothesis(json);
+    static fromJSON(json, baseOffset) {
+        return new SpeechHypothesis(json, baseOffset);
+    }
+    updateOffset(baseOffset) {
+        this.privSpeechHypothesis.Offset += baseOffset;
+    }
+    asJson() {
+        return JSON.stringify(this.privSpeechHypothesis);
     }
     get Text() {
         return this.privSpeechHypothesis.Text;
@@ -34865,11 +39225,12 @@ var SpeechKeyword$1 = {};
 Object.defineProperty(SpeechKeyword$1, "__esModule", { value: true });
 SpeechKeyword$1.SpeechKeyword = void 0;
 class SpeechKeyword {
-    constructor(json) {
+    constructor(json, baseOffset) {
         this.privSpeechKeyword = JSON.parse(json);
+        this.privSpeechKeyword.Offset += baseOffset;
     }
-    static fromJSON(json) {
-        return new SpeechKeyword(json);
+    static fromJSON(json, baseOffset) {
+        return new SpeechKeyword(json, baseOffset);
     }
     get Status() {
         return this.privSpeechKeyword.Status;
@@ -34882,6 +39243,9 @@ class SpeechKeyword {
     }
     get Duration() {
         return this.privSpeechKeyword.Duration;
+    }
+    asJson() {
+        return JSON.stringify(this.privSpeechKeyword);
     }
 }
 SpeechKeyword$1.SpeechKeyword = SpeechKeyword;
@@ -34908,17 +39272,16 @@ function requireSpeechServiceRecognizer () {
 	    async processTypeSpecificMessages(connectionMessage) {
 	        let result;
 	        const resultProps = new Exports_js_1.PropertyCollection();
-	        resultProps.setProperty(Exports_js_1.PropertyId.SpeechServiceResponse_JsonResult, connectionMessage.textBody);
 	        let processed = false;
 	        switch (connectionMessage.path.toLowerCase()) {
 	            case "speech.hypothesis":
 	            case "speech.fragment":
-	                const hypothesis = Exports_js_2.SpeechHypothesis.fromJSON(connectionMessage.textBody);
-	                const offset = hypothesis.Offset + this.privRequestSession.currentTurnAudioOffset;
-	                result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, Exports_js_1.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, undefined, // Speaker Id
-	                undefined, connectionMessage.textBody, resultProps);
-	                this.privRequestSession.onHypothesis(offset);
-	                const ev = new Exports_js_1.SpeechRecognitionEventArgs(result, hypothesis.Duration, this.privRequestSession.sessionId);
+	                const hypothesis = Exports_js_2.SpeechHypothesis.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                resultProps.setProperty(Exports_js_1.PropertyId.SpeechServiceResponse_JsonResult, hypothesis.asJson());
+	                result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, Exports_js_1.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, hypothesis.Offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, undefined, // Speaker Id
+	                undefined, hypothesis.asJson(), resultProps);
+	                this.privRequestSession.onHypothesis(hypothesis.Offset);
+	                const ev = new Exports_js_1.SpeechRecognitionEventArgs(result, hypothesis.Offset, this.privRequestSession.sessionId);
 	                if (!!this.privSpeechRecognizer.recognizing) {
 	                    try {
 	                        this.privSpeechRecognizer.recognizing(this.privSpeechRecognizer, ev);
@@ -34932,37 +39295,39 @@ function requireSpeechServiceRecognizer () {
 	                processed = true;
 	                break;
 	            case "speech.phrase":
-	                const simple = Exports_js_2.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody);
+	                const simple = Exports_js_2.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                resultProps.setProperty(Exports_js_1.PropertyId.SpeechServiceResponse_JsonResult, simple.asJson());
 	                const resultReason = Exports_js_2.EnumTranslation.implTranslateRecognitionResult(simple.RecognitionStatus, this.privExpectContentAssessmentResponse);
-	                this.privRequestSession.onPhraseRecognized(this.privRequestSession.currentTurnAudioOffset + simple.Offset + simple.Duration);
+	                this.privRequestSession.onPhraseRecognized(simple.Offset + simple.Duration);
 	                if (Exports_js_1.ResultReason.Canceled === resultReason) {
 	                    const cancelReason = Exports_js_2.EnumTranslation.implTranslateCancelResult(simple.RecognitionStatus);
 	                    const cancellationErrorCode = Exports_js_2.EnumTranslation.implTranslateCancelErrorCode(simple.RecognitionStatus);
 	                    await this.cancelRecognitionLocal(cancelReason, cancellationErrorCode, Exports_js_2.EnumTranslation.implTranslateErrorDetails(cancellationErrorCode));
 	                }
 	                else {
-	                    if (!(this.privRequestSession.isSpeechEnded && resultReason === Exports_js_1.ResultReason.NoMatch && simple.RecognitionStatus !== Exports_js_2.RecognitionStatus.InitialSilenceTimeout)) {
-	                        if (this.privRecognizerConfig.parameters.getProperty(Exports_js_2.OutputFormatPropertyName) === Exports_js_1.OutputFormat[Exports_js_1.OutputFormat.Simple]) {
-	                            result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, simple.DisplayText, simple.Duration, simple.Offset + this.privRequestSession.currentTurnAudioOffset, simple.Language, simple.LanguageDetectionConfidence, undefined, // Speaker Id
-	                            undefined, connectionMessage.textBody, resultProps);
+	                    // Like the native SDK's, don't event / return an EndOfDictation message.
+	                    if (simple.RecognitionStatus === Exports_js_2.RecognitionStatus.EndOfDictation) {
+	                        break;
+	                    }
+	                    if (this.privRecognizerConfig.parameters.getProperty(Exports_js_2.OutputFormatPropertyName) === Exports_js_1.OutputFormat[Exports_js_1.OutputFormat.Simple]) {
+	                        result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, simple.DisplayText, simple.Duration, simple.Offset, simple.Language, simple.LanguageDetectionConfidence, undefined, // Speaker Id
+	                        undefined, simple.asJson(), resultProps);
+	                    }
+	                    else {
+	                        const detailed = Exports_js_2.DetailedSpeechPhrase.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                        resultProps.setProperty(Exports_js_1.PropertyId.SpeechServiceResponse_JsonResult, detailed.asJson());
+	                        result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, detailed.RecognitionStatus === Exports_js_2.RecognitionStatus.Success ? detailed.NBest[0].Display : "", detailed.Duration, detailed.Offset, detailed.Language, detailed.LanguageDetectionConfidence, undefined, // Speaker Id
+	                        undefined, detailed.asJson(), resultProps);
+	                    }
+	                    const event = new Exports_js_1.SpeechRecognitionEventArgs(result, result.offset, this.privRequestSession.sessionId);
+	                    if (!!this.privSpeechRecognizer.recognized) {
+	                        try {
+	                            this.privSpeechRecognizer.recognized(this.privSpeechRecognizer, event);
+	                            /* eslint-disable no-empty */
 	                        }
-	                        else {
-	                            const detailed = Exports_js_2.DetailedSpeechPhrase.fromJSON(connectionMessage.textBody);
-	                            const totalOffset = detailed.Offset + this.privRequestSession.currentTurnAudioOffset;
-	                            const offsetCorrectedJson = detailed.getJsonWithCorrectedOffsets(totalOffset);
-	                            result = new Exports_js_1.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, detailed.RecognitionStatus === Exports_js_2.RecognitionStatus.Success ? detailed.NBest[0].Display : undefined, detailed.Duration, totalOffset, detailed.Language, detailed.LanguageDetectionConfidence, undefined, // Speaker Id
-	                            undefined, offsetCorrectedJson, resultProps);
-	                        }
-	                        const event = new Exports_js_1.SpeechRecognitionEventArgs(result, result.offset, this.privRequestSession.sessionId);
-	                        if (!!this.privSpeechRecognizer.recognized) {
-	                            try {
-	                                this.privSpeechRecognizer.recognized(this.privSpeechRecognizer, event);
-	                                /* eslint-disable no-empty */
-	                            }
-	                            catch (error) {
-	                                // Not going to let errors in the event handler
-	                                // trip things up.
-	                            }
+	                        catch (error) {
+	                            // Not going to let errors in the event handler
+	                            // trip things up.
 	                        }
 	                    }
 	                    if (!!this.privSuccessCallback) {
@@ -35063,10 +39428,9 @@ function requireConversationTranscriptionServiceRecognizer () {
 	        switch (connectionMessage.path.toLowerCase()) {
 	            case "speech.hypothesis":
 	            case "speech.fragment":
-	                const hypothesis = Exports_js_2.SpeechHypothesis.fromJSON(connectionMessage.textBody);
-	                const offset = hypothesis.Offset + this.privRequestSession.currentTurnAudioOffset;
-	                result = new Exports_js_1.ConversationTranscriptionResult(this.privRequestSession.requestId, Exports_js_1.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, hypothesis.SpeakerId, undefined, connectionMessage.textBody, resultProps);
-	                this.privRequestSession.onHypothesis(offset);
+	                const hypothesis = Exports_js_2.SpeechHypothesis.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                result = new Exports_js_1.ConversationTranscriptionResult(this.privRequestSession.requestId, Exports_js_1.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, hypothesis.Offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, hypothesis.SpeakerId, undefined, hypothesis.asJson(), resultProps);
+	                this.privRequestSession.onHypothesis(hypothesis.Offset);
 	                const ev = new Exports_js_1.ConversationTranscriptionEventArgs(result, hypothesis.Duration, this.privRequestSession.sessionId);
 	                if (!!this.privConversationTranscriber.transcribing) {
 	                    try {
@@ -35081,9 +39445,9 @@ function requireConversationTranscriptionServiceRecognizer () {
 	                processed = true;
 	                break;
 	            case "speech.phrase":
-	                const simple = Exports_js_2.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody);
+	                const simple = Exports_js_2.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
 	                const resultReason = Exports_js_2.EnumTranslation.implTranslateRecognitionResult(simple.RecognitionStatus);
-	                this.privRequestSession.onPhraseRecognized(this.privRequestSession.currentTurnAudioOffset + simple.Offset + simple.Duration);
+	                this.privRequestSession.onPhraseRecognized(simple.Offset + simple.Duration);
 	                if (Exports_js_1.ResultReason.Canceled === resultReason) {
 	                    const cancelReason = Exports_js_2.EnumTranslation.implTranslateCancelResult(simple.RecognitionStatus);
 	                    const cancellationErrorCode = Exports_js_2.EnumTranslation.implTranslateCancelErrorCode(simple.RecognitionStatus);
@@ -35092,13 +39456,11 @@ function requireConversationTranscriptionServiceRecognizer () {
 	                else {
 	                    if (!(this.privRequestSession.isSpeechEnded && resultReason === Exports_js_1.ResultReason.NoMatch && simple.RecognitionStatus !== Exports_js_2.RecognitionStatus.InitialSilenceTimeout)) {
 	                        if (this.privRecognizerConfig.parameters.getProperty(Exports_js_2.OutputFormatPropertyName) === Exports_js_1.OutputFormat[Exports_js_1.OutputFormat.Simple]) {
-	                            result = new Exports_js_1.ConversationTranscriptionResult(this.privRequestSession.requestId, resultReason, simple.DisplayText, simple.Duration, simple.Offset + this.privRequestSession.currentTurnAudioOffset, simple.Language, simple.LanguageDetectionConfidence, simple.SpeakerId, undefined, connectionMessage.textBody, resultProps);
+	                            result = new Exports_js_1.ConversationTranscriptionResult(this.privRequestSession.requestId, resultReason, simple.DisplayText, simple.Duration, simple.Offset, simple.Language, simple.LanguageDetectionConfidence, simple.SpeakerId, undefined, simple.asJson(), resultProps);
 	                        }
 	                        else {
-	                            const detailed = Exports_js_2.DetailedSpeechPhrase.fromJSON(connectionMessage.textBody);
-	                            const totalOffset = detailed.Offset + this.privRequestSession.currentTurnAudioOffset;
-	                            const offsetCorrectedJson = detailed.getJsonWithCorrectedOffsets(totalOffset);
-	                            result = new Exports_js_1.ConversationTranscriptionResult(this.privRequestSession.requestId, resultReason, detailed.RecognitionStatus === Exports_js_2.RecognitionStatus.Success ? detailed.NBest[0].Display : undefined, detailed.Duration, totalOffset, detailed.Language, detailed.LanguageDetectionConfidence, simple.SpeakerId, undefined, offsetCorrectedJson, resultProps);
+	                            const detailed = Exports_js_2.DetailedSpeechPhrase.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                            result = new Exports_js_1.ConversationTranscriptionResult(this.privRequestSession.requestId, resultReason, detailed.RecognitionStatus === Exports_js_2.RecognitionStatus.Success ? detailed.NBest[0].Display : undefined, detailed.Duration, detailed.Offset, detailed.Language, detailed.LanguageDetectionConfidence, simple.SpeakerId, undefined, detailed.asJson(), resultProps);
 	                        }
 	                        const event = new Exports_js_1.ConversationTranscriptionEventArgs(result, result.offset, this.privRequestSession.sessionId);
 	                        if (!!this.privConversationTranscriber.transcribed) {
@@ -35311,39 +39673,38 @@ function requireDetailedSpeechPhrase () {
 	DetailedSpeechPhrase.DetailedSpeechPhrase = void 0;
 	const Exports_js_1 = requireExports();
 	let DetailedSpeechPhrase$1 = class DetailedSpeechPhrase {
-	    constructor(json) {
+	    constructor(json, baseOffset) {
 	        this.privDetailedSpeechPhrase = JSON.parse(json);
-	        this.privDetailedSpeechPhrase.RecognitionStatus = Exports_js_1.RecognitionStatus[this.privDetailedSpeechPhrase.RecognitionStatus];
+	        this.privDetailedSpeechPhrase.RecognitionStatus = this.mapRecognitionStatus(this.privDetailedSpeechPhrase.RecognitionStatus);
+	        this.updateOffsets(baseOffset);
 	    }
-	    static fromJSON(json) {
-	        return new DetailedSpeechPhrase(json);
+	    static fromJSON(json, baseOffset) {
+	        return new DetailedSpeechPhrase(json, baseOffset);
 	    }
-	    getJsonWithCorrectedOffsets(baseOffset) {
+	    updateOffsets(baseOffset) {
+	        this.privDetailedSpeechPhrase.Offset += baseOffset;
 	        if (!!this.privDetailedSpeechPhrase.NBest) {
-	            let firstWordOffset;
 	            for (const phrase of this.privDetailedSpeechPhrase.NBest) {
-	                if (!!phrase.Words && !!phrase.Words[0]) {
-	                    firstWordOffset = phrase.Words[0].Offset;
-	                    break;
-	                }
-	            }
-	            if (!!firstWordOffset && firstWordOffset < baseOffset) {
-	                const offset = baseOffset - firstWordOffset;
-	                for (const details of this.privDetailedSpeechPhrase.NBest) {
-	                    if (!!details.Words) {
-	                        for (const word of details.Words) {
-	                            word.Offset += offset;
-	                        }
+	                if (!!phrase.Words) {
+	                    for (const word of phrase.Words) {
+	                        word.Offset += baseOffset;
 	                    }
-	                    if (!!details.DisplayWords) {
-	                        for (const word of details.DisplayWords) {
-	                            word.Offset += offset;
-	                        }
+	                }
+	                if (!!phrase.DisplayWords) {
+	                    for (const word of phrase.DisplayWords) {
+	                        word.Offset += baseOffset;
 	                    }
 	                }
 	            }
 	        }
-	        return JSON.stringify(this.privDetailedSpeechPhrase);
+	    }
+	    asJson() {
+	        const jsonObj = { ...this.privDetailedSpeechPhrase };
+	        // Convert the enum value to its string representation for serialization purposes.
+	        return JSON.stringify({
+	            ...jsonObj,
+	            RecognitionStatus: Exports_js_1.RecognitionStatus[jsonObj.RecognitionStatus]
+	        });
 	    }
 	    get RecognitionStatus() {
 	        return this.privDetailedSpeechPhrase.RecognitionStatus;
@@ -35372,6 +39733,14 @@ function requireDetailedSpeechPhrase () {
 	    get SpeakerId() {
 	        return this.privDetailedSpeechPhrase.SpeakerId;
 	    }
+	    mapRecognitionStatus(status) {
+	        if (typeof status === "string") {
+	            return Exports_js_1.RecognitionStatus[status];
+	        }
+	        else if (typeof status === "number") {
+	            return status;
+	        }
+	    }
 	};
 	DetailedSpeechPhrase.DetailedSpeechPhrase = DetailedSpeechPhrase$1;
 
@@ -35392,12 +39761,24 @@ function requireSimpleSpeechPhrase () {
 	SimpleSpeechPhrase.SimpleSpeechPhrase = void 0;
 	const Exports_js_1 = requireExports();
 	let SimpleSpeechPhrase$1 = class SimpleSpeechPhrase {
-	    constructor(json) {
+	    constructor(json, baseOffset = 0) {
 	        this.privSimpleSpeechPhrase = JSON.parse(json);
-	        this.privSimpleSpeechPhrase.RecognitionStatus = Exports_js_1.RecognitionStatus[this.privSimpleSpeechPhrase.RecognitionStatus];
+	        this.privSimpleSpeechPhrase.RecognitionStatus = this.mapRecognitionStatus(this.privSimpleSpeechPhrase.RecognitionStatus); // RecognitionStatus[this.privSimpleSpeechPhrase.RecognitionStatus as unknown as keyof typeof RecognitionStatus];
+	        this.updateOffset(baseOffset);
 	    }
-	    static fromJSON(json) {
-	        return new SimpleSpeechPhrase(json);
+	    static fromJSON(json, baseOffset) {
+	        return new SimpleSpeechPhrase(json, baseOffset);
+	    }
+	    updateOffset(baseOffset) {
+	        this.privSimpleSpeechPhrase.Offset += baseOffset;
+	    }
+	    asJson() {
+	        const jsonObj = { ...this.privSimpleSpeechPhrase };
+	        // Convert the enum value to its string representation for serialization purposes.
+	        return JSON.stringify({
+	            ...jsonObj,
+	            RecognitionStatus: Exports_js_1.RecognitionStatus[jsonObj.RecognitionStatus]
+	        });
 	    }
 	    get RecognitionStatus() {
 	        return this.privSimpleSpeechPhrase.RecognitionStatus;
@@ -35419,6 +39800,14 @@ function requireSimpleSpeechPhrase () {
 	    }
 	    get SpeakerId() {
 	        return this.privSimpleSpeechPhrase.SpeakerId;
+	    }
+	    mapRecognitionStatus(status) {
+	        if (typeof status === "string") {
+	            return Exports_js_1.RecognitionStatus[status];
+	        }
+	        else if (typeof status === "number") {
+	            return status;
+	        }
 	    }
 	};
 	SimpleSpeechPhrase.SimpleSpeechPhrase = SimpleSpeechPhrase$1;
@@ -35487,10 +39876,10 @@ function requireIntentServiceRecognizer () {
 	        }
 	        switch (connectionMessage.path.toLowerCase()) {
 	            case "speech.hypothesis":
-	                const speechHypothesis = Exports_js_3.SpeechHypothesis.fromJSON(connectionMessage.textBody);
-	                result = new Exports_js_2.IntentRecognitionResult(undefined, this.privRequestSession.requestId, Exports_js_2.ResultReason.RecognizingIntent, speechHypothesis.Text, speechHypothesis.Duration, speechHypothesis.Offset + this.privRequestSession.currentTurnAudioOffset, speechHypothesis.Language, speechHypothesis.LanguageDetectionConfidence, undefined, connectionMessage.textBody, resultProps);
+	                const speechHypothesis = Exports_js_3.SpeechHypothesis.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                result = new Exports_js_2.IntentRecognitionResult(undefined, this.privRequestSession.requestId, Exports_js_2.ResultReason.RecognizingIntent, speechHypothesis.Text, speechHypothesis.Duration, speechHypothesis.Offset, speechHypothesis.Language, speechHypothesis.LanguageDetectionConfidence, undefined, speechHypothesis.asJson(), resultProps);
 	                this.privRequestSession.onHypothesis(result.offset);
-	                ev = new Exports_js_2.IntentRecognitionEventArgs(result, speechHypothesis.Offset + this.privRequestSession.currentTurnAudioOffset, this.privRequestSession.sessionId);
+	                ev = new Exports_js_2.IntentRecognitionEventArgs(result, speechHypothesis.Offset, this.privRequestSession.sessionId);
 	                if (!!this.privIntentRecognizer.recognizing) {
 	                    try {
 	                        this.privIntentRecognizer.recognizing(this.privIntentRecognizer, ev);
@@ -35504,8 +39893,8 @@ function requireIntentServiceRecognizer () {
 	                processed = true;
 	                break;
 	            case "speech.phrase":
-	                const simple = Exports_js_3.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody);
-	                result = new Exports_js_2.IntentRecognitionResult(undefined, this.privRequestSession.requestId, Exports_js_3.EnumTranslation.implTranslateRecognitionResult(simple.RecognitionStatus), simple.DisplayText, simple.Duration, simple.Offset + this.privRequestSession.currentTurnAudioOffset, simple.Language, simple.LanguageDetectionConfidence, undefined, connectionMessage.textBody, resultProps);
+	                const simple = Exports_js_3.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                result = new Exports_js_2.IntentRecognitionResult(undefined, this.privRequestSession.requestId, Exports_js_3.EnumTranslation.implTranslateRecognitionResult(simple.RecognitionStatus), simple.DisplayText, simple.Duration, simple.Offset, simple.Language, simple.LanguageDetectionConfidence, undefined, simple.asJson(), resultProps);
 	                ev = new Exports_js_2.IntentRecognitionEventArgs(result, result.offset, this.privRequestSession.sessionId);
 	                const sendEvent = () => {
 	                    if (!!this.privIntentRecognizer.recognized) {
@@ -36493,8 +40882,8 @@ function requireDialogServiceAdapter () {
 	        let processed;
 	        switch (connectionMessage.path.toLowerCase()) {
 	            case "speech.phrase":
-	                const speechPhrase = Exports_js_4.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody);
-	                this.privRequestSession.onPhraseRecognized(this.privRequestSession.currentTurnAudioOffset + speechPhrase.Offset + speechPhrase.Duration);
+	                const speechPhrase = Exports_js_4.SimpleSpeechPhrase.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                this.privRequestSession.onPhraseRecognized(speechPhrase.Offset + speechPhrase.Duration);
 	                if (speechPhrase.RecognitionStatus !== Exports_js_4.RecognitionStatus.TooManyRequests && speechPhrase.RecognitionStatus !== Exports_js_4.RecognitionStatus.Error) {
 	                    const args = this.fireEventForResult(speechPhrase, resultProps);
 	                    this.privLastResult = args.result;
@@ -36512,11 +40901,10 @@ function requireDialogServiceAdapter () {
 	                processed = true;
 	                break;
 	            case "speech.hypothesis":
-	                const hypothesis = Exports_js_4.SpeechHypothesis.fromJSON(connectionMessage.textBody);
-	                const offset = hypothesis.Offset + this.privRequestSession.currentTurnAudioOffset;
-	                result = new Exports_js_3.SpeechRecognitionResult(this.privRequestSession.requestId, Exports_js_3.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, undefined, undefined, connectionMessage.textBody, resultProps);
-	                this.privRequestSession.onHypothesis(offset);
-	                const ev = new Exports_js_3.SpeechRecognitionEventArgs(result, hypothesis.Duration, this.privRequestSession.sessionId);
+	                const hypothesis = Exports_js_4.SpeechHypothesis.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                result = new Exports_js_3.SpeechRecognitionResult(this.privRequestSession.requestId, Exports_js_3.ResultReason.RecognizingSpeech, hypothesis.Text, hypothesis.Duration, hypothesis.Offset, hypothesis.Language, hypothesis.LanguageDetectionConfidence, undefined, undefined, hypothesis.asJson(), resultProps);
+	                this.privRequestSession.onHypothesis(hypothesis.Offset);
+	                const ev = new Exports_js_3.SpeechRecognitionEventArgs(result, hypothesis.Offset, this.privRequestSession.sessionId);
 	                if (!!this.privDialogServiceConnector.recognizing) {
 	                    try {
 	                        this.privDialogServiceConnector.recognizing(this.privDialogServiceConnector, ev);
@@ -36530,8 +40918,8 @@ function requireDialogServiceAdapter () {
 	                processed = true;
 	                break;
 	            case "speech.keyword":
-	                const keyword = Exports_js_4.SpeechKeyword.fromJSON(connectionMessage.textBody);
-	                result = new Exports_js_3.SpeechRecognitionResult(this.privRequestSession.requestId, keyword.Status === "Accepted" ? Exports_js_3.ResultReason.RecognizedKeyword : Exports_js_3.ResultReason.NoMatch, keyword.Text, keyword.Duration, keyword.Offset, undefined, undefined, undefined, undefined, connectionMessage.textBody, resultProps);
+	                const keyword = Exports_js_4.SpeechKeyword.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
+	                result = new Exports_js_3.SpeechRecognitionResult(this.privRequestSession.requestId, keyword.Status === "Accepted" ? Exports_js_3.ResultReason.RecognizedKeyword : Exports_js_3.ResultReason.NoMatch, keyword.Text, keyword.Duration, keyword.Offset, undefined, undefined, undefined, undefined, keyword.asJson(), resultProps);
 	                if (keyword.Status !== "Accepted") {
 	                    this.privLastResult = result;
 	                }
@@ -36685,7 +41073,7 @@ function requireDialogServiceAdapter () {
 	                        }
 	                        break;
 	                    case "speech.startdetected":
-	                        const speechStartDetected = Exports_js_4.SpeechDetected.fromJSON(connectionMessage.textBody);
+	                        const speechStartDetected = Exports_js_4.SpeechDetected.fromJSON(connectionMessage.textBody, this.privRequestSession.currentTurnAudioOffset);
 	                        const speechStartEventArgs = new Exports_js_3.RecognitionEventArgs(speechStartDetected.Offset, this.privRequestSession.sessionId);
 	                        if (!!this.privRecognizer.speechStartDetected) {
 	                            this.privRecognizer.speechStartDetected(this.privRecognizer, speechStartEventArgs);
@@ -36700,9 +41088,9 @@ function requireDialogServiceAdapter () {
 	                            // If the request was empty, the JSON returned is empty.
 	                            json = "{ Offset: 0 }";
 	                        }
-	                        const speechStopDetected = Exports_js_4.SpeechDetected.fromJSON(json);
-	                        this.privRequestSession.onServiceRecognized(speechStopDetected.Offset + this.privRequestSession.currentTurnAudioOffset);
-	                        const speechStopEventArgs = new Exports_js_3.RecognitionEventArgs(speechStopDetected.Offset + this.privRequestSession.currentTurnAudioOffset, this.privRequestSession.sessionId);
+	                        const speechStopDetected = Exports_js_4.SpeechDetected.fromJSON(json, this.privRequestSession.currentTurnAudioOffset);
+	                        this.privRequestSession.onServiceRecognized(speechStopDetected.Offset);
+	                        const speechStopEventArgs = new Exports_js_3.RecognitionEventArgs(speechStopDetected.Offset, this.privRequestSession.sessionId);
 	                        if (!!this.privRecognizer.speechEndDetected) {
 	                            this.privRecognizer.speechEndDetected(this.privRecognizer, speechStopEventArgs);
 	                        }
@@ -36830,9 +41218,8 @@ function requireDialogServiceAdapter () {
 	    }
 	    fireEventForResult(serviceResult, properties) {
 	        const resultReason = Exports_js_4.EnumTranslation.implTranslateRecognitionResult(serviceResult.RecognitionStatus);
-	        const offset = serviceResult.Offset + this.privRequestSession.currentTurnAudioOffset;
-	        const result = new Exports_js_3.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, serviceResult.DisplayText, serviceResult.Duration, offset, serviceResult.Language, serviceResult.LanguageDetectionConfidence, undefined, undefined, JSON.stringify(serviceResult), properties);
-	        const ev = new Exports_js_3.SpeechRecognitionEventArgs(result, offset, this.privRequestSession.sessionId);
+	        const result = new Exports_js_3.SpeechRecognitionResult(this.privRequestSession.requestId, resultReason, serviceResult.DisplayText, serviceResult.Duration, serviceResult.Offset, serviceResult.Language, serviceResult.LanguageDetectionConfidence, undefined, undefined, serviceResult.asJson(), properties);
+	        const ev = new Exports_js_3.SpeechRecognitionEventArgs(result, serviceResult.Offset, this.privRequestSession.sessionId);
 	        return ev;
 	    }
 	    handleResponseMessage(responseMessage) {
@@ -39474,6 +43861,7 @@ function requireAvatarSynthesisAdapter () {
 	                character: this.privAvatarConfig.character,
 	                customized: this.privAvatarConfig.customized,
 	                style: this.privAvatarConfig.style,
+	                useBuiltInVoice: this.privAvatarConfig.useBuiltInVoice,
 	            }
 	        };
 	    }
@@ -40309,7 +44697,7 @@ var SpeechServiceConfig = {};
 	class System {
 	    constructor() {
 	        // Note: below will be patched for official builds.
-	        const SPEECHSDK_CLIENTSDK_VERSION = "1.41.0";
+	        const SPEECHSDK_CLIENTSDK_VERSION = "1.43.1";
 	        this.name = "SpeechSDK";
 	        this.version = SPEECHSDK_CLIENTSDK_VERSION;
 	        this.build = "JavaScript";
@@ -40441,7 +44829,7 @@ function requireExports () {
 		exports.CancellationErrorCodePropertyName = "CancellationErrorCode";
 		exports.ServicePropertiesPropertyName = "ServiceProperties";
 		exports.ForceDictationPropertyName = "ForceDictation";
-		exports.AutoDetectSourceLanguagesOpenRangeOptionName = "OpenRange";
+		exports.AutoDetectSourceLanguagesOpenRangeOptionName = "UND";
 
 		
 	} (Exports$6));
@@ -40473,51 +44861,22 @@ function requireExports () {
 	
 } (microsoft_cognitiveservices_speech_sdk));
 
-// components/speech.js
-
+// speech.js
 
 /**
- * @param {string} message
- * @param {string} voiceURI
- * @param {number} pitch
- * @param {number} rate
- * @param {number} volume
+ * Speech component using Microsoft Cognitive Services Speech SDK.
  */
-async function speak(message, voiceURI, pitch, rate, volume) {
-  if (!message) return;
-  const voices = await getVoices();
-  const voice = voiceURI && voices.find((voice) => voice.voiceURI === voiceURI);
-  const utterance = new SpeechSynthesisUtterance(message);
-  
-  if (voice) {
-    utterance.voice = voice;
-    utterance.lang = voice.lang;
-  }
-  
-  utterance.pitch = pitch;
-  utterance.rate = rate;
-  utterance.volume = volume;
-  
-  // Cancel any ongoing speech synthesis
-  speechSynthesis.cancel();
-  
-  // Speak the utterance
-  speechSynthesis.speak(utterance);
-}
-
 class Speech extends TreeBase {
+  // Define properties with default values
   stateName = new String$1("$Speak");
-  voiceURI = new String$1("$VoiceURI", "en-US-DavisNeural"); // Default to Davis
+  voiceURI = new String$1("$VoiceURI", "en-US-DavisNeural"); // Default to DavisNeural
   expressStyle = new String$1("$ExpressStyle", "friendly"); // Default expression style
-  pitch = new Float("$Pitch", 0); // Default pitch adjustment (percentage)
-  rate = new Float("$Rate", 1); // Default rate (percentage)
-  volume = new Float("$Volume", 1); // Default volume (percentage)
   isSpeaking = false; // Track if currently speaking
+  startTime = null; // Track synthesis start time
 
   constructor() {
     super();
     this.initSynthesizer();
-    this.handleStateUpdates = this.handleStateUpdates.bind(this);
   }
 
   /**
@@ -40529,272 +44888,130 @@ class Speech extends TreeBase {
   }
 
   /**
-   * Initializes the Speech Synthesizer with Microsoft Cognitive Services Speech SDK.
+   * Initializes the Speech Synthesizer with the Microsoft SDK.
    */
   initSynthesizer() {
-    try {
-      // Initialize speech configuration with subscription key and region
-      // Replace with your actual subscription key and region
-      this.speechConfig = microsoft_cognitiveservices_speech_sdk.SpeechConfig.fromSubscription(
-        "c7d8e36fdf414cbaae05819919fd416d", // Replace with your actual subscription key
-        "eastus"    // e.g., "eastus"
-      );
+    this.speechConfig = microsoft_cognitiveservices_speech_sdk.SpeechConfig.fromSubscription(
+      'c7d8e36fdf414cbaae05819919fd416d', // Replace with your actual subscription key
+      'eastus' // Replace with your service region
+    );
 
-      this.speechConfig.speechSynthesisOutputFormat =
-        microsoft_cognitiveservices_speech_sdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3; // High-quality MP3 format
+    this.speechConfig.speechSynthesisOutputFormat =
+      microsoft_cognitiveservices_speech_sdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3;
 
-      this.audioConfig = microsoft_cognitiveservices_speech_sdk.AudioConfig.fromDefaultSpeakerOutput();
-      this.synthesizer = new microsoft_cognitiveservices_speech_sdk.SpeechSynthesizer(
-        this.speechConfig,
-        this.audioConfig
-      );
+    this.audioConfig = microsoft_cognitiveservices_speech_sdk.AudioConfig.fromDefaultSpeakerOutput();
+    this.synthesizer = new microsoft_cognitiveservices_speech_sdk.SpeechSynthesizer(
+      this.speechConfig,
+      this.audioConfig
+    );
 
-      // Event listeners for synthesis lifecycle
-      this.synthesizer.synthesisStarted = (s, e) =>
-        this.logWithTimestamp("Synthesis started");
-      this.synthesizer.synthesisCompleted = (s, e) => {
-        this.logWithTimestamp("Synthesis completed");
-        this.isSpeaking = false; // Reset speaking flag
-      };
-      this.synthesizer.synthesisCanceled = (s, e) => {
-        this.logWithTimestamp(
-          `Synthesis canceled: ${e.reason} - ${e.errorDetails}`
-        );
-        this.isSpeaking = false; // Reset speaking flag
-      };
-      this.synthesizer.synthesisFailed = (s, e) => {
-        this.logWithTimestamp(`Synthesis failed: ${e.errorDetails}`);
-        this.isSpeaking = false; // Reset speaking flag
-      };
+    this.synthesizer.synthesisStarted = (s, e) => {
+      this.startTime = performance.now();
+      this.logWithTimestamp("Synthesis started");
+    };
 
-      this.logWithTimestamp("Synthesizer initialized.");
-    } catch (error) {
-      this.logWithTimestamp(`Error initializing synthesizer: ${error}`);
-    }
+    this.synthesizer.synthesisCompleted = (s, e) => {
+      const endTime = performance.now();
+      const latency = endTime - this.startTime;
+      this.logWithTimestamp(`Synthesis completed in ${latency.toFixed(2)} ms`);
+      this.isSpeaking = false;
+      this.initSynthesizer();
+    };
+
+    this.synthesizer.synthesisCanceled = (s, e) => {
+      this.logWithTimestamp(`Synthesis canceled: ${e.reason}`);
+      this.isSpeaking = false;
+      this.initSynthesizer();
+    };
   }
 
   /**
-   * Constructs SSML with the specified parameters.
-   * @param {string} message - The message to synthesize.
-   * @param {string} voice - The voice URI.
-   * @param {string} style - The express-as style.
-   * @param {number} pitch - The pitch adjustment (percentage).
-   * @param {number} rate - The speaking rate (percentage).
-   * @param {number} volume - The volume level (percentage).
-   * @returns {string} - The constructed SSML string.
-   */
-  constructSSML(message, voice, style, pitch, rate, volume) {
-    return `
-      <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" 
-             xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
-        <voice name="${voice}">
-          <mstts:express-as style="${style}">
-            <prosody pitch="${pitch}%" rate="${rate}%" volume="${volume}%">
-              ${message}
-            </prosody>
-          </mstts:express-as>
-        </voice>
-      </speak>`;
-  }
-
-  /**
-   * Initiates speech synthesis of the provided message.
+   * Initiates speech synthesis for the given message.
    */
   async speak() {
     if (this.isSpeaking) {
       this.logWithTimestamp("Cancelling current speech synthesis.");
-      this.synthesizer.close(); // Close the current synthesizer to cancel
+      this.synthesizer.close();
       this.isSpeaking = false;
-      this.initSynthesizer(); // Re-initialize synthesizer after cancellation
     }
+
+    this.isSpeaking = true;
 
     const { state } = Globals;
     const message = state.get(this.stateName.value);
     const voice = state.get(this.voiceURI.value) || "en-US-DavisNeural";
     const style = state.get(this.expressStyle.value) || "friendly";
-    const pitch = state.get(this.pitch.value) || 0; // Percentage
-    const rate = state.get(this.rate.value) || 1; // Percentage
-    const volume = state.get(this.volume.value) || 1; // Percentage
 
     if (!message) {
       this.logWithTimestamp("No message to speak.");
+      this.isSpeaking = false;
       return;
     }
 
-    this.logWithTimestamp(
-      `Speaking with Voice: ${voice}, Style: ${style}, Pitch: ${pitch}%, Rate: ${rate}%, Volume: ${volume}%`
-    );
+    this.logWithTimestamp(`Using voice: ${voice}, style: ${style}, message: ${message}`);
 
-    const ssml = this.constructSSML(message, voice, style, pitch, rate, volume);
+    const ssml = `
+      <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
+        <voice name="${voice}">
+          <mstts:express-as style="${style}">
+            ${this.escapeSSML(message)}
+          </mstts:express-as>
+        </voice>
+      </speak>`;
 
     try {
-      this.isSpeaking = true;
+      this.startTime = performance.now();
       this.synthesizer.speakSsmlAsync(
         ssml,
         (result) => {
-          if (
-            result.reason === microsoft_cognitiveservices_speech_sdk.ResultReason.SynthesizingAudioCompleted
-          ) {
-            this.logWithTimestamp("Speech synthesized successfully.");
+          const endTime = performance.now();
+          const latency = endTime - this.startTime;
+          if (result.reason === microsoft_cognitiveservices_speech_sdk.ResultReason.SynthesizingAudioCompleted) {
+            this.logWithTimestamp(`Speech synthesized successfully in ${latency.toFixed(2)} ms`);
           } else if (result.reason === microsoft_cognitiveservices_speech_sdk.ResultReason.Canceled) {
-            const cancellation = microsoft_cognitiveservices_speech_sdk.SpeechSynthesisCancellationDetails.fromResult(
-              result
-            );
+            const cancellationDetails = microsoft_cognitiveservices_speech_sdk.SpeechSynthesisCancellationDetails.fromResult(result);
             this.logWithTimestamp(
-              `Speech synthesis canceled: ${cancellation.reason} - ${cancellation.errorDetails}`
+              `Speech synthesis canceled: ${cancellationDetails.reason}, ${cancellationDetails.errorDetails}`
             );
           }
           this.isSpeaking = false;
-          this.initSynthesizer(); // Re-initialize after synthesis
+          this.initSynthesizer();
         },
         (error) => {
           this.logWithTimestamp(`An error occurred: ${error}`);
           this.isSpeaking = false;
-          this.initSynthesizer(); // Re-initialize after error
+          this.initSynthesizer();
         }
       );
     } catch (error) {
       this.logWithTimestamp(`Error in speak method: ${error}`);
       this.isSpeaking = false;
-      this.initSynthesizer(); // Re-initialize after error
+      this.initSynthesizer();
     }
   }
 
-  /**
-   * Handles state updates to trigger speech synthesis.
-   */
-  handleStateUpdates() {
-    const { state } = Globals;
-    if (state.hasBeenUpdated(this.stateName.value)) {
-      this.speak();
-    }
+  escapeSSML(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  /**
-   * Lifecycle method called when the component is added to the DOM.
-   */
-  init() {
-    super.init();
-    // Subscribe to state updates
-    Globals.state.subscribe(this.handleStateUpdates);
-  }
-
-  /**
-   * Lifecycle method called when the component is removed from the DOM.
-   */
   disconnectedCallback() {
     if (this.isSpeaking) {
       this.synthesizer.close();
       this.isSpeaking = false;
-      this.logWithTimestamp("Synthesizer stopped on component disconnect.");
+      this.logWithTimestamp("Synthesizer stopped on component disconnect");
     }
-    // Unsubscribe from state updates to prevent memory leaks
-    Globals.state.unsubscribe(this.handleStateUpdates);
   }
 
-  /**
-   * Renders the component.
-   * @returns {TemplateResult} - The rendered HTML template.
-   */
   template() {
-    return html`<div />`; // Empty div as no UI is needed
+    const { state } = Globals;
+    if (state.hasBeenUpdated(this.stateName.value)) {
+      this.speak();
+    }
+    return html`<div />`;
   }
 }
 
-// Register the Speech class with the component framework
 TreeBase.register(Speech, "Speech");
-
-/**
- * Optional: Custom Voice Selection Component for Microsoft TTS
- * Note: Microsoft TTS handles voices via SSML, so fetching available voices may require backend support or a predefined list.
- */
-
-class VoiceSelect extends HTMLSelectElement {
-  constructor() {
-    super();
-    this.populateVoices = this.populateVoices.bind(this);
-  }
-
-  connectedCallback() {
-    this.populateVoices();
-    // Listen for changes and update the selected voice in the state
-    this.addEventListener("change", this.onVoiceChange);
-  }
-
-  disconnectedCallback() {
-    this.removeEventListener("change", this.onVoiceChange);
-  }
-
-  async populateVoices() {
-    try {
-      // Fetch available voices from your backend or define them statically
-      const voices = await fetchAvailableMicrosoftVoices(); // Implement this function based on your setup
-
-      // Sort voices alphabetically
-      voices.sort((a, b) => a.localeCompare(b));
-
-      const current = this.getAttribute("value") || "en-US-DavisNeural";
-      voices.forEach((voice) => {
-        const option = document.createElement("option");
-        option.value = voice;
-        option.text = voice; // You can format this better if needed
-        if (voice === current) option.selected = true;
-        this.add(option);
-      });
-    } catch (error) {
-      console.error("Error populating voices:", error);
-    }
-  }
-
-  onVoiceChange(event) {
-    const selectedVoice = event.target.value;
-    // Update the state with the selected voice
-    Globals.state.set("$VoiceURI", selectedVoice);
-  }
-}
-
-// Register the custom element
-customElements.define("select-microsoft-voice", VoiceSelect, {
-  extends: "select",
-});
-
-/**
- * Helper Function to Fetch Available Microsoft TTS Voices
- * Implement this based on your backend or configuration.
- * For example, you can fetch from a predefined list or an API endpoint.
- */
-async function fetchAvailableMicrosoftVoices() {
-  // Example static list; replace with dynamic fetching if necessary
-  return [
-    "en-US-DavisNeural",
-    "en-US-JennyNeural",
-    "en-US-GuyNeural",
-    "en-US-AriaNeural",
-    "en-US-BrandonNeural",
-    "en-US-CelineNeural",
-    // Add more voices as needed
-  ];
-}
-
-/**
- * Promise to return voices
- *
- * @return {Promise<SpeechSynthesisVoice[]>} Available voices
- */
-function getVoices() {
-  return new Promise(function (resolve) {
-    // iOS won't fire the voiceschanged event so we have to poll for them
-    function f() {
-      voices = (voices.length && voices) || speechSynthesis.getVoices();
-      if (voices.length) resolve(voices);
-      else setTimeout(f, 100);
-    }
-    f();
-  });
-}
-
-/** @type{SpeechSynthesisVoice[]} */
-let voices = [];
 
 /** @param {string} filename */
 async function playAudio(filename) {
@@ -41053,7 +45270,7 @@ async function ClearLog() {
  * Download the conversation history as a CSV file.
  */
 async function DownloadCSV() {
-  const serverUrl = "http://34.118.128.211:5678/download_csv"; // Adjust if necessary
+  const serverUrl = "http://34.136.166.29:5678/download_csv"; // Adjust if necessary
 
   try {
     const response = await fetch(serverUrl);
@@ -42045,6 +46262,10 @@ class Actions extends DesignerPanel {
             ]),
           );
           Globals.state.update(patch);
+          // Trigger the DownloadCSV function if $triggerDownloadCSV state is updated
+          if (patch['$triggerDownloadCSV'] === true || patch['$triggerDownloadCSV'] === 1) {
+            DownloadCSV();
+          }
           break;
         }
       }
@@ -42812,12 +47033,7 @@ function execFinalizer(finalizer) {
 }
 
 var config = {
-    onUnhandledError: null,
-    onStoppedNotification: null,
-    Promise: undefined,
-    useDeprecatedSynchronousErrorHandling: false,
-    useDeprecatedNextContext: false,
-};
+    Promise: undefined};
 
 var timeoutProvider = {
     setTimeout: function (handler, timeout) {
@@ -42828,8 +47044,7 @@ var timeoutProvider = {
         return setTimeout.apply(void 0, __spreadArray([handler, timeout], __read(args)));
     },
     clearTimeout: function (handle) {
-        var delegate = timeoutProvider.delegate;
-        return ((delegate === null || delegate === void 0 ? void 0 : delegate.clearTimeout) || clearTimeout)(handle);
+        return (clearTimeout)(handle);
     },
     delegate: undefined,
 };
@@ -42917,10 +47132,6 @@ var Subscriber = (function (_super) {
     };
     return Subscriber;
 }(Subscription));
-var _bind = Function.prototype.bind;
-function bind(fn, thisArg) {
-    return _bind.call(fn, thisArg);
-}
 var ConsumerObserver = (function () {
     function ConsumerObserver(partialObserver) {
         this.partialObserver = partialObserver;
@@ -42976,17 +47187,7 @@ var SafeSubscriber = (function (_super) {
             };
         }
         else {
-            var context_1;
-            if (_this && config.useDeprecatedNextContext) {
-                context_1 = Object.create(observerOrNext);
-                context_1.unsubscribe = function () { return _this.unsubscribe(); };
-                partialObserver = {
-                    next: observerOrNext.next && bind(observerOrNext.next, context_1),
-                    error: observerOrNext.error && bind(observerOrNext.error, context_1),
-                    complete: observerOrNext.complete && bind(observerOrNext.complete, context_1),
-                };
-            }
-            else {
+            {
                 partialObserver = observerOrNext;
             }
         }
@@ -43955,9 +48156,9 @@ function map(project, thisArg) {
     });
 }
 
-var isArray$1 = Array.isArray;
+var isArray = Array.isArray;
 function callOrApply(fn, args) {
-    return isArray$1(args) ? fn.apply(void 0, __spreadArray([], __read(args))) : fn(args);
+    return isArray(args) ? fn.apply(void 0, __spreadArray([], __read(args))) : fn(args);
 }
 function mapOneOrManyArgs(fn) {
     return map(function (args) { return callOrApply(fn, args); });
@@ -44131,11 +48332,6 @@ function merge$1() {
                 mergeAll(concurrent)(from(sources, scheduler));
 }
 
-var isArray = Array.isArray;
-function argsOrArgArray(args) {
-    return args.length === 1 && isArray(args[0]) ? args[0] : args;
-}
-
 function filter(predicate, thisArg) {
     return operate(function (source, subscriber) {
         var index = 0;
@@ -44253,7 +48449,7 @@ function defaultCompare(a, b) {
 }
 
 function distinctUntilKeyChanged(key, compare) {
-    return distinctUntilChanged(function (x, y) { return x[key] === y[key]; });
+    return distinctUntilChanged(function (x, y) { return (x[key] === y[key]); });
 }
 
 function groupBy(keySelector, elementOrOptions, duration, connector) {
@@ -44318,7 +48514,6 @@ function merge() {
     }
     var scheduler = popScheduler(args);
     var concurrent = popNumber(args, Infinity);
-    args = argsOrArgArray(args);
     return operate(function (source, subscriber) {
         mergeAll(concurrent)(from(__spreadArray([source], __read(args)), scheduler)).subscribe(subscriber);
     });
@@ -45297,13 +49492,19 @@ const defaultPatterns = {
   ],
 };
 
-// only run one animation at a time
+// index.js
+
+// Create a singleton instance of Speech
+new Speech();
+
+// Only run one animation at a time
 let animationNonce = 0;
 
-/** @param {Target} target
+/**
+ * @param {Target} target
  * @param {string} defaultValue
  * @param {boolean} isGroup
- * */
+ */
 function cueTarget(target, defaultValue, isGroup = false) {
   let fields = {};
   if (target instanceof HTMLButtonElement) {
@@ -45329,13 +49530,11 @@ function cueTarget(target, defaultValue, isGroup = false) {
   if (!isGroup && cue) {
     if (cue.SpeechField.value) {
       const message = fields[cue.SpeechField.value.slice(1)];
-      speak(
-        message,
-        cue.voiceURI.value,
-        cue.pitch.value,
-        cue.rate.value,
-        cue.volume.value,
-      );
+      // Trigger speech synthesis using the Speech class instance
+      // Update the global state to notify the Speech component
+      Globals.state.set("$Speak", message);
+      Globals.state.set("$VoiceURI", cue.voiceURI.value);
+      Globals.state.set("$ExpressStyle", cue.expressStyle.value || "friendly"); // Default style if not provided
     }
     if (cue.AudioField.value) {
       const file = fields[cue.AudioField.value.slice(1)] || "";
@@ -45343,6 +49542,8 @@ function cueTarget(target, defaultValue, isGroup = false) {
     }
   }
 }
+
+
 
 function clearCues() {
   for (const element of document.querySelectorAll("#UI [cue]")) {
@@ -48558,50 +52759,41 @@ class Menu {
 
 let registration;
 function workerCheckForUpdate() {
-  if (registration) {
-    registration.update();
-  }
+  registration?.update().catch(console.error);
 }
-function signalUpdateAvailable() {
+function showUpdateButton() {
   document.body.classList.add("update-available");
 }
-if (navigator.serviceWorker) {
+if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
-    registration = await navigator.serviceWorker.register("service-worker.js", {
-      scope: "/OS-DPI/"
-    });
-    if (registration.waiting) {
-      signalUpdateAvailable();
-    }
-    registration.addEventListener("updatefound", () => {
-      if (registration.installing) {
-        registration.installing.addEventListener("statechange", () => {
-          if (registration.waiting) {
-            if (navigator.serviceWorker.controller) {
-              signalUpdateAvailable();
-            } else {
-              console.log("Service Worker initialized for the first time");
+    try {
+      registration = await navigator.serviceWorker.register("/service-worker.js", {
+        scope: "/"
+        // may control the whole origin
+      });
+      if (registration.waiting) showUpdateButton();
+      registration.addEventListener("updatefound", () => {
+        const sw = registration.installing;
+        if (sw)
+          sw.addEventListener("statechange", () => {
+            if (registration.waiting && navigator.serviceWorker.controller) {
+              showUpdateButton();
             }
-          }
-        });
-      }
-    });
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (!refreshing) {
+          });
+      });
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
         window.location.reload();
-        refreshing = true;
-      }
-    });
+      });
+    } catch (err) {
+      console.error("SW registration failed:", err);
+    }
   });
 }
 function workerUpdateButton() {
   return html`<button
     id="update-available-button"
     @click=${() => {
-    if (registration && registration.waiting) {
-      registration.waiting.postMessage("SKIP_WAITING");
-    }
+    if (registration?.waiting) registration.waiting.postMessage("SKIP_WAITING");
   }}
     title="Click to update the app"
   >
@@ -49062,6 +53254,18 @@ function getPanelMenuItems(type) {
   return { child: menuItems, parent: [...parentItems.values()] };
 }
 
+
+/** Build the editor root, stripping "/client" if we are on that page */
+function editorRoot() {
+  const parts = window.location.pathname.split("/");
+  // /session/<sid>/client  →  ["", "session", sid, "client"]
+  // /session/<sid>         →  ["", "session", sid          ]
+  if (parts[3] === "client") parts.pop();          // remove "client"
+  return parts.join("/") || "/";                   // join back to string
+}
+
+
+
 /** @param {ToolBar} bar */
 function getFileMenuItems(bar) {
   return [
@@ -49077,34 +53281,49 @@ function getFileMenuItems(bar) {
         })
           .then((file) => wait(local_db.readDesignFromFile(file)))
           .then(() => {
-            window.open(`#${local_db.designName}`, "_blank", `noopener=true`);
+            window.open(
+              `${editorRoot()}#${local_db.designName}`,
+              "_blank",
+              "noopener"
+            );
           })
-          .catch((e) => console.log(e));
+          .catch(console.log);
       },
     }),
     new MenuItem({
       label: "Import URL",
-      callback: () => bar.importURLDialog.open(),
+      callback: () =>
+        bar.importURLDialog.open().then((designName) => {
+          if (designName) {
+            window.open(
+              `${editorRoot()}#${designName}`,
+              "_blank",
+              "noopener"
+            );
+          }
+        }),
     }),
     new MenuItem({
       label: "Export",
-      callback: () => {
-        db.saveDesign();
-      },
+      callback: () => db.saveDesign(),
     }),
     new MenuItem({
       label: "New",
       callback: async () => {
         const name = await db.uniqueName("new");
-        window.open(`#${name}`, "_blank", `noopener=true`);
+        window.open(
+          `${editorRoot()}#${name}`,
+          "_blank",
+          "noopener"
+        );
       },
     }),
     new MenuItem({
       label: "Open",
-      callback: () => {
-        bar.designListDialog.open();
-      },
+      callback: () => bar.designListDialog.open(),
     }),
+
+
     new MenuItem({
       label: "Unload",
       callback: async () => {
@@ -49570,25 +53789,39 @@ class ImportURLDialog {
   }
 }
 
+
+
 class ToolBar extends TreeBase {
   constructor() {
     super();
-    this.fileMenu = new Menu("File", getFileMenuItems, this);
-    this.editMenu = new Menu("Edit", getEditMenuItems);
-    this.addMenu = new Menu(
+    this.fileMenu        = new Menu("File", getFileMenuItems, this);
+    this.editMenu        = new Menu("Edit", getEditMenuItems);
+    this.addMenu         = new Menu(
       "Add",
       () => {
         const { child, parent } = getPanelMenuItems("add");
-        if (parent.length > 0) {
-          parent[0].divider = "Parent" + (parent.length > 1 ? "s" : "");
-        }
+        if (parent.length) parent[0].divider = "Parent" + (parent.length > 1 ? "s" : "");
         return child.concat(parent);
       },
       "add",
     );
-    this.helpMenu = new Menu("Help", getHelpMenuItems, this);
+    this.helpMenu        = new Menu("Help", getHelpMenuItems, this);
     this.designListDialog = new DesignListDialog();
-    this.importURLDialog = new ImportURLDialog();
+    this.importURLDialog  = new ImportURLDialog();
+  }
+
+  /* Collaboration URL for the active session + current #hash  */
+  get clientURL() {
+    const [, , sessionId] = window.location.pathname.split("/");
+    const hash            = window.location.hash;          // includes leading “#” or ""
+    return `${location.origin}/session/${sessionId}/client${hash}`;
+  }
+
+  /* Copy URL to clipboard and/or open new tab */
+  openClient() {
+    const url = this.clientURL;
+    navigator.clipboard.writeText(url).catch(() => {});
+    window.open(url, "_blank", "noopener");
   }
 
   template() {
@@ -49603,58 +53836,66 @@ class ToolBar extends TreeBase {
                 type="text"
                 .value=${db.designName}
                 .size=${Math.max(db.designName.length, 12)}
-                @change=${(/** @type {InputEventWithTarget} */ event) =>
-                  db
-                    .renameDesign(event.target.value)
-                    .then(() => (window.location.hash = db.designName))}
+                @change=${(e) =>
+                  db.renameDesign(e.target.value).then(() => (window.location.hash = db.designName))}
               />`,
               "N",
             )}
           </li>
+
+          <li>${hinted(this.fileMenu.render(), "F")}</li>
+          <li>${hinted(this.editMenu.render(), "E")}</li>
+          <li>${hinted(this.addMenu.render(), "A")}</li>
+          <li>${hinted(this.helpMenu.render(), "H")}</li>
+
+          <!-- Client link button -->
           <li>
-            ${
-              // @ts-ignore
-              hinted(this.fileMenu.render(), "F")
-            }
+            ${hinted(
+              html`<button
+                class="client-btn"
+                title="Open read-only client & copy link"
+                @click=${() => this.openClient()}
+              >
+                Client
+              </button>`,
+              "C",
+            )}
           </li>
-          <li>
-            ${
-              // @ts-ignore
-              hinted(this.editMenu.render(), "E")
-            }
-          </li>
-          <li>
-            ${
-              // @ts-ignore
-              hinted(this.addMenu.render(), "A")
-            }
-          </li>
-          <li>
-            ${
-              // @ts-ignore
-              hinted(this.helpMenu.render(), "H")
-            }
-          </li>
+
           <li>${workerUpdateButton()}</li>
         </ul>
-        ${this.designListDialog.template()} ${this.importURLDialog.template()}
+
+        ${this.designListDialog.template()}
+        ${this.importURLDialog.template()}
       </div>
     `;
   }
 }
 TreeBase.register(ToolBar, "ToolBar");
 
-/** let me wait for the page to load */
-const pageLoaded = new Promise((resolve) => {
+/** wait for the page to load */
+const pageLoaded = new Promise(resolve => {
   window.addEventListener("load", () => {
     document.body.classList.add("loaded");
     resolve(true);
   });
 });
 
-/** Load page and data then go
- */
 async function start() {
+  // 1) Parse sessionId from URL
+  const [, , sessionId] = window.location.pathname.split("/");
+
+  // 2) Init Socket.IO
+  const socket = lookup("/", { query: { sessionId } });
+  Globals.socket = socket;
+
+  // 3) Handle incoming keyPress events
+  socket.on("keyPress", ({ x, y }) => {
+    // e.g. update state or highlight button:
+    // Globals.state.update({ lastKeyPress: { x, y } });
+  });
+
+  // …the rest is your existing logic unchanged…
   let editing = true;
   if (window.location.search) {
     const params = new URLSearchParams(window.location.search);
@@ -49662,13 +53903,16 @@ async function start() {
     console.log({ fetch });
     if (fetch) {
       await wait(
-        db.readDesignFromURL(fetch, window.location.hash.slice(1)),
+        db.readDesignFromURL(fetch, window.location.hash.slice(1))
       );
       editing = params.get("edit") !== null;
       window.history.replaceState(
         {},
         document.title,
-        window.location.origin + window.location.pathname + "#" + db.designName,
+        window.location.origin +
+          window.location.pathname +
+          "#" +
+          db.designName
       );
     }
   }
@@ -49692,13 +53936,11 @@ async function start() {
   Globals.patterns = await PatternList.load(PatternList);
   Globals.method = await MethodChooser.load(MethodChooser);
   Globals.restart = async () => {
-    // tear down any existing event handlers before restarting
     Globals.method.stop();
     start();
   };
   Globals.error = new Messages();
 
-  /** @param {() => void} f */
   function debounce(f) {
     let timeout = null;
     return () => {
@@ -49707,42 +53949,31 @@ async function start() {
     };
   }
 
-  /* Designer */
-  Globals.state.define("editing", editing); // for now
-  Globals.designer = /** @type {Designer} */ (
-    Designer.fromObject({
-      className: "Designer",
-      props: { tabEdge: "top", stateName: "designerTab" },
-      children: [
-        layout,
-        {
-          className: "Content",
-          props: {},
-          children: [],
-        },
-        Globals.actions,
-        Globals.cues,
-        Globals.patterns,
-        Globals.method,
-      ],
-    })
-  );
+  Globals.state.define("editing", editing);
+  Globals.designer = Designer.fromObject({
+    className: "Designer",
+    props: { tabEdge: "top", stateName: "designerTab" },
+    children: [
+      layout,
+      { className: "Content", props: {}, children: [] },
+      Globals.actions,
+      Globals.cues,
+      Globals.patterns,
+      Globals.method,
+    ],
+  });
 
-  /* ToolBar */
   const toolbar = ToolBar.create("ToolBar", null);
   toolbar.init();
 
-  /* Monitor */
   const monitor = Monitor.create("Monitor", null);
   monitor.init();
 
   function renderUI() {
-    // report the time to draw the frame
     if (location.host.startsWith("localhost")) {
       const startTime = performance.now();
       const timer = document.getElementById("timer");
       if (timer) {
-        // I think this makes it wait until all drawing is done.
         requestAnimationFrame(() => {
           setTimeout(() => {
             timer.innerText = `${(performance.now() - startTime).toFixed(0)}ms`;
@@ -49750,7 +53981,6 @@ async function start() {
         });
       }
     }
-    // the real update begins here
     const editing = Globals.state.get("editing");
     document.body.classList.toggle("designing", editing);
     safeRender("cues", Globals.cues);
@@ -49763,11 +53993,8 @@ async function start() {
     }
     postRender();
     Globals.method.refresh();
-    // clear the accessed bits for the next cycle
     accessed.clear();
-    // clear the updated bits for the next cycle
     Globals.state.clearUpdated();
-
     workerCheckForUpdate();
     document.dispatchEvent(new Event("rendercomplete"));
   }
@@ -49776,39 +54003,29 @@ async function start() {
   renderUI();
 }
 
-/* Watch for updates happening in other tabs */
+// existing BroadcastChannel + hashchange + resize logic…
 const channel = new BroadcastChannel("os-dpi");
-/** @param {MessageEvent} event */
-channel.onmessage = (event) => {
-  const message = /** @type {UpdateNotification} */ (event.data);
+channel.onmessage = event => {
+  const message = event.data;
   if (db.designName == message.name) {
-    if (message.action == "update") {
-      start();
-    } else if (message.action == "rename" && message.newName) {
+    if (message.action == "update") start();
+    else if (message.action == "rename" && message.newName)
       window.location.hash = message.newName;
-    } else if (message.action == "unload") {
+    else if (message.action == "unload") {
       window.close();
-      if (!window.closed) {
-        window.location.hash = "new";
-      }
+      if (!window.closed) window.location.hash = "new";
     }
   }
 };
-db.addUpdateListener((message) => {
-  channel.postMessage(message);
-});
-
-// watch for changes to the hash such as using the browser back button
+db.addUpdateListener(msg => channel.postMessage(msg));
 window.addEventListener("hashchange", () => {
   sessionStorage.clear();
   start();
 });
-
-// watch for window resize and force a redraw
 window.addEventListener("resize", () => {
   if (!Globals.state) return;
   Globals.state.update();
 });
 
 start();
-//# sourceMappingURL=index.js.map
+//# sourceMappingURL=start.BP7h3DwD.js.map

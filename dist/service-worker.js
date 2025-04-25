@@ -1,67 +1,67 @@
-var GHPATH = "/OS-DPI";
-var APP_PREFIX = "osdpi_";
-var VERSION = "2024-11-5-11-17-49";
-var URLS = [
-  `${GHPATH}/`,
-  `${GHPATH}/index.html`,
-  `${GHPATH}/index.css`,
-  `${GHPATH}/index.js`,
-  `${GHPATH}/xlsx.js`,
-  `${GHPATH}/favicon.ico`,
-  `${GHPATH}/icon.png`,
-  `${GHPATH}/tracky-mouse/lib/clmtrackr.js`,
-  `${GHPATH}/tracky-mouse/lib/stats.js`,
-  `${GHPATH}/tracky-mouse/lib/tf.js`,
-  `${GHPATH}/tracky-mouse/facemesh.worker.js`,
-  `${GHPATH}/tracky-mouse/lib/facemesh/facemesh.js`,
-  `${GHPATH}/tracky-mouse/lib/facemesh/facemesh/model.json`,
-  `${GHPATH}/tracky-mouse/lib/facemesh/facemesh/group1-shard1of1.bin`,
-  `${GHPATH}/tracky-mouse/lib/facemesh/blazeface/model.json`,
-  `${GHPATH}/tracky-mouse/lib/facemesh/blazeface/group1-shard1of1.bin`
+/* ------------------------------------------------------------------
+   OS-DPI – minimal, bullet-proof PWA worker
+   • No wild-cards
+   • Network-first, cache-fallback strategy
+------------------------------------------------------------------- */
+
+const CACHE = "osdpi-v1";
+
+/* exact files we really need offline */
+const PRECACHE = [
+  "/",                       // index.html
+  "/index.html",
+  "/client.html",
+  "/service-worker.js",
+  "/css/site.css",
+  // add more built files here IF you need them offline
 ];
-var CACHE_NAME = APP_PREFIX + VERSION;
-self.addEventListener("fetch", function(e) {
-  const url = new URL(e.request.url);
-  if (URLS.includes(url.pathname)) {
-    e.respondWith(
-      caches.match(e.request).then(function(request) {
-        if (request) {
-          return request;
-        } else {
-          return fetch(e.request);
-        }
+
+/* ---------- install ----------------------------------------------------- */
+self.addEventListener("install", (evt) => {
+  evt.waitUntil(
+    caches.open(CACHE)
+      .then((c) => c.addAll(PRECACHE))
+      .catch((err) => console.warn("SW precache failed:", err))
+      .then(() => self.skipWaiting())
+  );
+});
+
+/* ---------- activate ---------------------------------------------------- */
+self.addEventListener("activate", (evt) => {
+  evt.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.map((k) => (k !== CACHE ? caches.delete(k) : undefined)))
+    )
+  );
+  self.clients.claim();
+});
+
+/* ---------- fetch ------------------------------------------------------- */
+self.addEventListener("fetch", (evt) => {
+  const { request } = evt;
+
+  /* only cache same-origin GET over http/https */
+  if (
+    request.method !== "GET" ||
+    !request.url.startsWith(self.location.origin)
+  ) {
+    return;                          // just let it pass through
+  }
+
+  evt.respondWith(
+    fetch(request)
+      .then((netResp) => {
+        const clone = netResp.clone();
+        caches.open(CACHE).then((c) => c.put(request, clone));
+        return netResp;
       })
-    );
-  }
-});
-self.addEventListener("install", function(e) {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(function(cache) {
-      return cache.addAll(URLS);
-    })
+      .catch(() => caches.match(request))
   );
 });
-self.addEventListener("activate", function(e) {
-  e.waitUntil(
-    caches.keys().then(function(keyList) {
-      var cacheWhitelist = keyList.filter(function(key) {
-        return key.indexOf(APP_PREFIX);
-      });
-      cacheWhitelist.push(CACHE_NAME);
-      return Promise.all(
-        keyList.map(function(key, i) {
-          if (cacheWhitelist.indexOf(key) === -1) {
-            return caches.delete(keyList[i]);
-          }
-        })
-      );
-    })
-  );
-});
-self.addEventListener("message", (event) => {
-  if (event.data === "SKIP_WAITING") {
-    /** @type {unknown} */
-    self.skipWaiting();
-  }
+
+
+/* ---------- messages ---------------------------------------------------- */
+self.addEventListener("message", (evt) => {
+  if (evt.data === "SKIP_WAITING") self.skipWaiting();
 });
 //# sourceMappingURL=service-worker.js.map

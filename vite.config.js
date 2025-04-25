@@ -1,4 +1,3 @@
-// vite.config.js
 import { defineConfig } from "vite";
 import path from "path";
 
@@ -14,7 +13,7 @@ const fullReloadAlways = {
 };
 
 export default defineConfig({
-  base: "/OS-DPI/",
+  base: "/",
   resolve: {
     alias: {
       components: path.resolve("./components"),
@@ -32,13 +31,18 @@ export default defineConfig({
     assetsInlineLimit: 0,
     rollupOptions: {
       input: {
-        index: "./index.html",
+        main: "./index.html",
+        client: "./client.html",
         "service-worker": "./service-worker.js",
       },
       output: {
-        entryFileNames: `[name].js`,
-        chunkFileNames: `[name].js`,
-        assetFileNames: `[name].[ext]`,
+        entryFileNames: (chunkInfo) => {
+          return chunkInfo.name === "service-worker" 
+            ? "[name].js" 
+            : "assets/[name].[hash].js";
+        },
+        chunkFileNames: "assets/[name].[hash].js",
+        assetFileNames: "assets/[name].[hash].[ext]",
       },
     },
   },
@@ -46,4 +50,12 @@ export default defineConfig({
     APP_VERSION: version,
   },
   plugins: [fullReloadAlways],
+  server: {
+    historyApiFallback: {
+      rewrites: [
+        { from: /\/session\/.*/, to: "/index.html" },
+        { from: /\/client/, to: "/client.html" },
+      ],
+    },
+  },
 });
