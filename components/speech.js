@@ -34,7 +34,7 @@ class Speech extends TreeBase {
    */
   initSynthesizer() {
     this.speechConfig = sdk.SpeechConfig.fromSubscription(
-      'c7d8e36fdf414cbaae05819919fd416d', // Replace with your actual subscription key
+      '', // Replace with your actual subscription key
       'eastus' // Replace with your service region
     );
 
