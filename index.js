@@ -23496,6 +23496,9 @@ function requireTranslationRecognizer () {
 	    static FromConfig(speechTranslationConfig, autoDetectSourceLanguageConfig, audioConfig) {
 	        const speechTranslationConfigImpl = speechTranslationConfig;
 	        autoDetectSourceLanguageConfig.properties.mergeTo(speechTranslationConfigImpl.properties);
+	        if (autoDetectSourceLanguageConfig.properties.getProperty(Exports_js_3.PropertyId.SpeechServiceConnection_AutoDetectSourceLanguages, undefined) === Exports_js_1.AutoDetectSourceLanguagesOpenRangeOptionName) {
+	            speechTranslationConfigImpl.properties.setProperty(Exports_js_3.PropertyId.SpeechServiceConnection_RecoLanguage, "en-US");
+	        }
 	        return new TranslationRecognizer(speechTranslationConfig, audioConfig);
 	    }
 	    /**
@@ -40670,7 +40673,7 @@ var SpeechServiceConfig = {};
 	class System {
 	    constructor() {
 	        // Note: below will be patched for official builds.
-	        const SPEECHSDK_CLIENTSDK_VERSION = "1.43.0";
+	        const SPEECHSDK_CLIENTSDK_VERSION = "1.43.1";
 	        this.name = "SpeechSDK";
 	        this.version = SPEECHSDK_CLIENTSDK_VERSION;
 	        this.build = "JavaScript";
@@ -40802,7 +40805,7 @@ function requireExports () {
 		exports.CancellationErrorCodePropertyName = "CancellationErrorCode";
 		exports.ServicePropertiesPropertyName = "ServiceProperties";
 		exports.ForceDictationPropertyName = "ForceDictation";
-		exports.AutoDetectSourceLanguagesOpenRangeOptionName = "OpenRange";
+		exports.AutoDetectSourceLanguagesOpenRangeOptionName = "UND";
 
 		
 	} (Exports$6));
@@ -40865,7 +40868,7 @@ class Speech extends TreeBase {
    */
   initSynthesizer() {
     this.speechConfig = microsoft_cognitiveservices_speech_sdk.SpeechConfig.fromSubscription(
-      'c7d8e36fdf414cbaae05819919fd416d', // Replace with your actual subscription key
+      '', // Replace with your actual subscription key
       'eastus' // Replace with your service region
     );
 
