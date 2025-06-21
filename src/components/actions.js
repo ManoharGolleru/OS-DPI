@@ -81,6 +81,16 @@ export class Actions extends DesignerPanel {
             ]),
           );
           Globals.state.update(patch);
+          // Single‐flag location control
+          if (patch.hasOwnProperty('$locationTracking')) {
+           if (patch.$locationTracking === true || patch.$locationTracking === 1) {
+              console.log('[Actions] ▶️ Location Tracking ON');
+              Globals.locationTracker.start();
+            } else {
+              console.log('[Actions] ⏹️ Location Tracking OFF');
+              Globals.locationTracker.stop();
+            }
+          }
           break;
         }
       }
