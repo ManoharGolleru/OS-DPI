@@ -19,6 +19,8 @@ import { callAfterRender, safeRender, postRender } from "./render";
 import { Designer } from "components/designer";
 import { workerCheckForUpdate } from "components/serviceWorker";
 import { accessed } from "./eval";
+import LocationTracker from "./components/locationTracker.js";
+
 
 /** let me wait for the page to load */
 const pageLoaded = new Promise((resolve) => {
@@ -150,6 +152,9 @@ export async function start() {
   Globals.state.observe(debounce(renderUI));
   callAfterRender(() => Globals.designer.restoreFocus());
   renderUI();
+
+  /* ---------- Location ---------- */
+  Globals.locationTracker = new LocationTracker();
 }
 
 /* Watch for updates happening in other tabs */
