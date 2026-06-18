@@ -20,6 +20,7 @@ import { Designer } from "components/designer";
 import { Content } from "components/content";
 import { workerCheckForUpdate } from "components/serviceWorker";
 import { accessed } from "./eval";
+import { installMockAuthoring } from "./authoring/dev";
 
 /** let me wait for the page to load */
 const pageLoaded = new Promise((resolve) => {
@@ -154,6 +155,7 @@ export async function start() {
   Globals.state.observe(debounce(renderUI));
   callAfterRender(() => Globals.designer.restoreFocus());
   renderUI();
+  installMockAuthoring();
 }
 
 /* Watch for updates happening in other tabs */

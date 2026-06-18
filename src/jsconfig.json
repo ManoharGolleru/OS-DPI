@@ -19,6 +19,10 @@
     "thinking",
     "OS-DPI",
     "public",
-    "components/headmouse/tracky-mouse"
+    "components/headmouse/tracky-mouse",
+    "authoring/**/*.test.js",
+    "authoring/e2e",
+    "playwright.config.js",
+    "vitest.config.js"
   ]
 }
