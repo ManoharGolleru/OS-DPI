@@ -8,9 +8,12 @@ const MVP_PLAN = {
 };
 
 export class UnsupportedAuthoringRequestError extends Error {
-  constructor() {
+  /** @param {string} [message] */
+  constructor(
+    message = 'Unsupported request. Authoring currently only supports requests like "Create an auto-scan interface where Enter selects the current button."',
+  ) {
     super(
-      'Unsupported request. Mock mode only supports requests like "Create an auto-scan interface where Enter selects the current button."',
+      message,
     );
     this.name = "UnsupportedAuthoringRequestError";
   }

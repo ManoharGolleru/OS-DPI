@@ -118,6 +118,7 @@ describe("plan validation", () => {
       startKey: "",
       selectKey: 4,
       intervalSeconds: 0,
+      restartAfterSelection: false,
       buttonLabels: ["Yes", ""],
     });
     expect(result.valid).toBe(false);

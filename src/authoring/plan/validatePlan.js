@@ -1,3 +1,5 @@
+import { AUTO_SCAN_PLAN_KEYS } from "./schema";
+
 export class AuthoringPlanValidationError extends Error {
   /** @param {string[]} errors */
   constructor(errors) {
@@ -18,6 +20,12 @@ export function validatePlan(plan) {
     return { valid: false, errors: ["plan must be an object"] };
   }
 
+  const unexpectedKeys = Object.keys(plan).filter(
+    (key) => !AUTO_SCAN_PLAN_KEYS.includes(key),
+  );
+  if (unexpectedKeys.length) {
+    errors.push(`unsupported plan fields: ${unexpectedKeys.join(", ")}`);
+  }
   if (plan.operation != "configure_auto_scan") {
     errors.push("operation must be configure_auto_scan");
   }
@@ -33,6 +41,9 @@ export function validatePlan(plan) {
     plan.intervalSeconds <= 0
   ) {
     errors.push("intervalSeconds must be greater than 0");
+  }
+  if (typeof plan.restartAfterSelection != "boolean") {
+    errors.push("restartAfterSelection must be a boolean");
   }
   if (!Array.isArray(plan.buttonLabels) || plan.buttonLabels.length < 2) {
     errors.push("buttonLabels must contain at least two labels");

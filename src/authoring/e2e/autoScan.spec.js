@@ -40,3 +40,52 @@ test("mock authoring creates a working recurring auto-scan design", async ({
   await expect(cued).toHaveCount(1, { timeout: 1500 });
   expect(consoleErrors).toEqual([]);
 });
+
+test("LLM dev mode validates a stubbed plan before applying it", async ({
+  page,
+}) => {
+  const consoleErrors = [];
+  page.on("console", (message) => {
+    if (message.type() == "error") consoleErrors.push(message.text());
+  });
+  page.on("pageerror", (error) => consoleErrors.push(error.message));
+
+  await page.route("**/api/authoring/plan", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        plan: {
+          operation: "configure_auto_scan",
+          startKey: "Space",
+          selectKey: "Enter",
+          intervalSeconds: 0.6,
+          restartAfterSelection: true,
+          buttonLabels: ["Yes", "No", "Help", "Stop"],
+        },
+        provider: "mock",
+        warnings: ["Stubbed by the browser test."],
+      }),
+    });
+  });
+
+  const designName = `authoring-llm-e2e-${Date.now()}`;
+  await page.goto(`?authoring=llm#${designName}`);
+
+  const generate = page.locator("#authoringGenerate");
+  const apply = page.locator("#authoringApply");
+  const status = page.locator("#authoringStatus");
+
+  await expect(apply).toBeDisabled();
+  await generate.click();
+  await expect(status).toHaveAttribute("data-status", "ready");
+  await expect(status).toContainText('"provider": "mock"');
+  await expect(apply).toBeEnabled();
+
+  await apply.click();
+  await expect(status).toHaveAttribute("data-status", "complete");
+  await expect(
+    page.locator('#UI button.button[name="authoring-auto-scan-button"]'),
+  ).toHaveCount(4);
+  expect(consoleErrors).toEqual([]);
+});
