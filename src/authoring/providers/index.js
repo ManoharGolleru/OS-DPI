@@ -3,9 +3,17 @@ import { createOpenAIProvider } from "./openaiProvider";
 
 /** Select a server-side planner without exposing credentials to the browser.
  * @param {Record<string, string | undefined>} env
- * @param {{fetchImpl?: typeof fetch}} [options]
+ * @param {{apiKey?: string, fetchImpl?: typeof fetch}} [options]
  */
 export function selectAuthoringProvider(env = {}, options = {}) {
+  if (options.apiKey) {
+    return createOpenAIProvider({
+      apiKey: options.apiKey,
+      model: env.OPENAI_MODEL || "gpt-5.5",
+      fetchImpl: options.fetchImpl,
+    });
+  }
+
   const requested = (env.AUTHORING_PROVIDER || "mock").toLowerCase();
 
   if (requested == "mock") {

@@ -1,8 +1,11 @@
-import { UnsupportedAuthoringRequestError } from "../plan/parseMockPrompt";
 import { AuthoringPlanValidationError } from "../plan/validatePlan";
 import { selectAuthoringProvider } from "../providers/index";
 
 const MAX_BODY_BYTES = 32 * 1024;
+const MAX_MESSAGES = 20;
+const MAX_MESSAGE_LENGTH = 4000;
+
+class AuthoringRequestError extends Error {}
 
 /** @param {any} request */
 export function isLocalRequest(request) {
@@ -29,10 +32,70 @@ async function readJson(request) {
   for await (const chunk of request) {
     body += chunk;
     if (body.length > MAX_BODY_BYTES) {
-      throw new Error("Authoring request is too large");
+      throw new AuthoringRequestError("Authoring request is too large");
     }
   }
-  return JSON.parse(body || "{}");
+  try {
+    return JSON.parse(body || "{}");
+  } catch {
+    throw new AuthoringRequestError("Authoring request body must be valid JSON");
+  }
+}
+
+/** Read an optional memory-only API key without putting it in the JSON body.
+ * @param {any} request
+ */
+export function extractBearerToken(request) {
+  const authorization = request.headers.authorization;
+  if (!authorization) return "";
+  if (
+    typeof authorization != "string" ||
+    !authorization.startsWith("Bearer ") ||
+    !authorization.slice(7).trim()
+  ) {
+    throw new AuthoringRequestError(
+      "Authorization header must use a non-empty Bearer token",
+    );
+  }
+  return authorization.slice(7).trim();
+}
+
+/** Keep chat input small and limited to user/assistant text.
+ * @param {any} messages
+ */
+export function sanitizeMessages(messages) {
+  if (
+    !Array.isArray(messages) ||
+    !messages.length ||
+    messages.length > MAX_MESSAGES
+  ) {
+    throw new AuthoringRequestError(
+      `messages must contain between 1 and ${MAX_MESSAGES} entries`,
+    );
+  }
+  const safe = messages.map((message) => {
+    if (
+      !message ||
+      !["user", "assistant"].includes(message.role) ||
+      typeof message.content != "string" ||
+      !message.content.trim() ||
+      message.content.length > MAX_MESSAGE_LENGTH
+    ) {
+      throw new AuthoringRequestError(
+        "messages require a user or assistant role and bounded non-empty text",
+      );
+    }
+    return {
+      role: message.role,
+      content: message.content.trim(),
+    };
+  });
+  if (safe[safe.length - 1].role != "user") {
+    throw new AuthoringRequestError(
+      "the latest authoring message must be from the user",
+    );
+  }
+  return safe;
 }
 
 /** Keep optional model context deliberately small and non-sensitive.
@@ -91,24 +154,21 @@ export function authoringPlanServer(options = {}) {
 
           try {
             const body = await readJson(request);
-            if (typeof body.prompt != "string" || !body.prompt.trim()) {
-              sendJson(response, 400, {
-                error: "prompt must be a non-empty string",
-              });
-              return;
-            }
+            const messages = sanitizeMessages(body.messages);
+            const apiKey = extractBearerToken(request);
 
             const provider = selectAuthoringProvider(env, {
+              apiKey,
               fetchImpl: options.fetchImpl,
             });
-            const result = await provider.createPlan({
-              prompt: body.prompt,
+            const result = await provider.createResponse({
+              messages,
               designSummary: sanitizeDesignSummary(body.designSummary),
             });
             sendJson(response, 200, result);
           } catch (error) {
-            if (error instanceof UnsupportedAuthoringRequestError) {
-              sendJson(response, 422, { error: error.message });
+            if (error instanceof AuthoringRequestError) {
+              sendJson(response, 400, { error: error.message });
               return;
             }
             if (error instanceof AuthoringPlanValidationError) {

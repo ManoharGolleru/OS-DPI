@@ -1,5 +1,13 @@
 import { AuthoringPlanValidationError, validatePlan } from "../plan/validatePlan";
 
+const AUTHORING_RESPONSE_KEYS = [
+  "kind",
+  "message",
+  "plan",
+  "provider",
+  "warnings",
+];
+
 export class AuthoringProviderResponseError extends Error {
   constructor(message) {
     super(message);
@@ -16,6 +24,24 @@ export function validateProviderResponse(response) {
       "Authoring server response must be an object",
     );
   }
+  const unexpectedKeys = Object.keys(response).filter(
+    (key) => !AUTHORING_RESPONSE_KEYS.includes(key),
+  );
+  if (unexpectedKeys.length) {
+    throw new AuthoringProviderResponseError(
+      `Authoring server returned unsupported fields: ${unexpectedKeys.join(", ")}`,
+    );
+  }
+  if (!["clarification", "plan", "unsupported"].includes(response.kind)) {
+    throw new AuthoringProviderResponseError(
+      "Authoring server returned an unknown response kind",
+    );
+  }
+  if (typeof response.message != "string" || !response.message.trim()) {
+    throw new AuthoringProviderResponseError(
+      "Authoring server message must be a non-empty string",
+    );
+  }
   if (!["mock", "openai"].includes(response.provider)) {
     throw new AuthoringProviderResponseError(
       "Authoring server returned an unknown provider",
@@ -30,33 +56,79 @@ export function validateProviderResponse(response) {
     );
   }
 
-  const validation = validatePlan(response.plan);
-  if (!validation.valid) {
-    throw new AuthoringPlanValidationError(validation.errors);
+  if (response.kind == "plan") {
+    const validation = validatePlan(response.plan);
+    if (!validation.valid) {
+      throw new AuthoringPlanValidationError(validation.errors);
+    }
+  } else if (response.plan !== null) {
+    throw new AuthoringProviderResponseError(
+      `${response.kind} responses must not contain a plan`,
+    );
   }
 
   return {
+    kind: response.kind,
+    message: response.message,
     plan: response.plan,
     provider: response.provider,
     warnings: [...response.warnings],
   };
 }
 
-/** Request a plan from the local-only authoring endpoint.
- * @param {string} prompt
- * @param {{designSummary?: Object, fetchImpl?: typeof fetch}} [options]
+/** Validate and copy the memory-only chat transcript.
+ * @param {any} messages
  */
-export async function requestAuthoringPlan(prompt, options = {}) {
+function normalizeMessages(messages) {
+  if (!Array.isArray(messages) || !messages.length) {
+    throw new AuthoringProviderResponseError(
+      "Authoring conversation requires at least one message",
+    );
+  }
+  return messages.map((message) => {
+    if (
+      !message ||
+      !["user", "assistant"].includes(message.role) ||
+      typeof message.content != "string" ||
+      !message.content.trim()
+    ) {
+      throw new AuthoringProviderResponseError(
+        "Authoring messages require a user or assistant role and non-empty content",
+      );
+    }
+    return {
+      role: message.role,
+      content: message.content.trim(),
+    };
+  });
+}
+
+/** Request a constrained chat response from the local-only endpoint.
+ * @param {{role: string, content: string}[]} messages
+ * @param {{
+ *   apiKey?: string,
+ *   designSummary?: Object,
+ *   fetchImpl?: typeof fetch
+ * }} [options]
+ */
+export async function requestAuthoringConversation(messages, options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch;
+  /** @type {Record<string, string>} */
+  const headers = {
+    "Content-Type": "application/json",
+  };
+  const apiKey = options.apiKey?.trim();
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+
   let response;
   try {
     response = await fetchImpl("/api/authoring/plan", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({
-        prompt,
+        messages: normalizeMessages(messages),
         designSummary: options.designSummary,
       }),
     });
@@ -72,4 +144,19 @@ export async function requestAuthoringPlan(prompt, options = {}) {
     );
   }
   return validateProviderResponse(payload);
+}
+
+/** One-shot compatibility wrapper for console and tests.
+ * @param {string} prompt
+ * @param {{
+ *   apiKey?: string,
+ *   designSummary?: Object,
+ *   fetchImpl?: typeof fetch
+ * }} [options]
+ */
+export function requestAuthoringPlan(prompt, options = {}) {
+  return requestAuthoringConversation(
+    [{ role: "user", content: prompt }],
+    options,
+  );
 }

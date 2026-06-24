@@ -35,21 +35,25 @@ http://127.0.0.1:8080/OS-DPI/?authoring=mock
 
 The **Create mock auto-scan** button applies the deterministic plan.
 
-## Milestone 2: optional LLM planner mode
+## Milestone 2: conversational LLM planner mode
 
 The LLM is a planner only:
 
-1. The browser sends a prompt and three optional design counts to the local
-   Vite development server.
-2. The selected provider returns only the approved edit-plan schema.
-3. The server validates the plan.
-4. The browser validates it again.
+1. A fixed local-development panel keeps a short in-memory conversation.
+2. The browser sends the conversation and three optional design counts to the
+   local Vite development server.
+3. The selected provider returns a strict `clarification`, `plan`, or
+   `unsupported` response.
+4. The server and browser both validate any returned plan.
 5. The existing OS-DPI authoring command applies the plan locally only after
-   validation succeeds.
+   the user reviews it and clicks **Apply plan**.
 
-The API key stays in the Vite server process. It is never included in browser
-code. The local endpoint does not write IndexedDB, construct OS-DPI JSON, or
-apply any design changes.
+An API key can be configured in the Vite server environment or pasted into the
+masked development field. A pasted key stays only in page memory, is sent to
+the loopback server in an `Authorization` header, and is cleared by reloading.
+It is never included in the conversation body, status output, or plan preview.
+The local endpoint does not write IndexedDB, construct OS-DPI JSON, or apply
+any design changes.
 
 The endpoint is installed as development middleware in the existing Vite
 server, so there is no second server process to run.
@@ -73,7 +77,8 @@ http://127.0.0.1:8080/OS-DPI/?authoring=llm
 ```
 
 Use **Generate with LLM** to request and inspect a plan. **Apply plan** remains
-disabled until validation passes.
+disabled during clarification and until validation passes. Sending another
+message clears the pending plan and requires a fresh review.
 
 If `AUTHORING_PROVIDER` is unset, the server uses the deterministic mock
 provider. If it is `openai` but `OPENAI_API_KEY` is missing, the server
@@ -101,4 +106,6 @@ Automated tests stub planner responses and never make paid API calls.
 - No model is fine-tuned.
 - Cloud API mode is for local development only until a production server and
   authentication design exist.
-- The UI is intentionally a minimal development hook, not a chat interface.
+- Conversation history, pasted keys, and pending plans are memory-only.
+- The chat is constrained to auto-scan clarification and planning; it is not a
+  general-purpose assistant.

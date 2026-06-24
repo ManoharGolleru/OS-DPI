@@ -124,6 +124,41 @@ describe("plan validation", () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toHaveLength(5);
   });
+
+  test.each([
+    ["Enter", "Enter"],
+    [" enter ", "ENTER"],
+    ["Space", "spacebar"],
+  ])("rejects equivalent start and select keys: %s / %s", (startKey, selectKey) => {
+    const result = validatePlan({
+      operation: "configure_auto_scan",
+      startKey,
+      selectKey,
+      intervalSeconds: 0.6,
+      restartAfterSelection: true,
+      buttonLabels: ["Yes", "No"],
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "startKey and selectKey must be different keys",
+    );
+  });
+
+  test("rejects unknown fields and raw OS-DPI JSON", () => {
+    expect(
+      validatePlan({
+        ...parseMockPrompt(PROMPT),
+        children: [{ className: "Page" }],
+      }).errors,
+    ).toContain("unsupported plan fields: children");
+    expect(
+      validatePlan({
+        className: "Layout",
+        props: {},
+        children: [],
+      }).valid,
+    ).toBe(false);
+  });
 });
 
 describe("configureAutoScan", () => {

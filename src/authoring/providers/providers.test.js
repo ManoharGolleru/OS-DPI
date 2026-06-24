@@ -1,19 +1,22 @@
 import { describe, expect, test, vi } from "vitest";
 import {
   AuthoringProviderResponseError,
+  requestAuthoringConversation,
   validateProviderResponse,
 } from "./localProvider";
 import { createMockProvider } from "./mockProvider";
 import {
   createOpenAIProvider,
-  extractOpenAIPlan,
+  extractOpenAIResponse,
+  normalizeOpenAIPlan,
 } from "./openaiProvider";
 import { selectAuthoringProvider } from "./index";
 import { AuthoringPlanValidationError } from "../plan/validatePlan";
-import { UnsupportedAuthoringRequestError } from "../plan/parseMockPrompt";
 import {
+  extractBearerToken,
   isLocalRequest,
   sanitizeDesignSummary,
+  sanitizeMessages,
 } from "../server/vitePlugin";
 
 const PROMPT =
@@ -28,41 +31,64 @@ const VALID_PLAN = {
   buttonLabels: ["Yes", "No", "Help", "Stop"],
 };
 
-function serverResponse(plan = VALID_PLAN) {
+const USER_MESSAGES = [{ role: "user", content: PROMPT }];
+
+function serverResponse(overrides = {}) {
   return {
-    plan,
+    kind: "plan",
+    message: "Plan ready.",
+    plan: VALID_PLAN,
     provider: "openai",
     warnings: [],
+    ...overrides,
   };
 }
 
-function openAIResponse(plan = VALID_PLAN) {
+function openAIResponse(result = {}) {
   return {
     status: "completed",
     output: [
       {
         type: "message",
-        content: [{ type: "output_text", text: JSON.stringify(plan) }],
+        content: [
+          {
+            type: "output_text",
+            text: JSON.stringify({
+              kind: "plan",
+              message: "Plan ready.",
+              plan: VALID_PLAN,
+              ...result,
+            }),
+          },
+        ],
       },
     ],
   };
 }
 
 describe("mock provider", () => {
-  test("returns the known valid plan", async () => {
+  test("returns the known valid plan envelope", async () => {
     await expect(
-      createMockProvider().createPlan({ prompt: PROMPT }),
+      createMockProvider().createResponse({ messages: USER_MESSAGES }),
     ).resolves.toEqual({
+      kind: "plan",
+      message: "The deterministic auto-scan plan is ready to review.",
       plan: VALID_PLAN,
       provider: "mock",
       warnings: [],
     });
   });
 
-  test("returns a clear unsupported error", async () => {
+  test("returns a clear unsupported envelope", async () => {
     await expect(
-      createMockProvider().createPlan({ prompt: "Build a full keyboard" }),
-    ).rejects.toBeInstanceOf(UnsupportedAuthoringRequestError);
+      createMockProvider().createResponse({
+        messages: [{ role: "user", content: "Build a full keyboard" }],
+      }),
+    ).resolves.toMatchObject({
+      kind: "unsupported",
+      plan: null,
+      provider: "mock",
+    });
   });
 });
 
@@ -75,13 +101,22 @@ describe("provider selection", () => {
     const provider = selectAuthoringProvider({
       AUTHORING_PROVIDER: "openai",
     });
-    const result = await provider.createPlan({ prompt: PROMPT });
+    const result = await provider.createResponse({ messages: USER_MESSAGES });
     expect(result.provider).toBe("mock");
     expect(result.warnings[0]).toContain("OPENAI_API_KEY");
   });
+
+  test("a pasted key takes precedence over mock environment configuration", () => {
+    expect(
+      selectAuthoringProvider(
+        { AUTHORING_PROVIDER: "mock" },
+        { apiKey: "sk-memory-only", fetchImpl: vi.fn() },
+      ).name,
+    ).toBe("openai");
+  });
 });
 
-describe("safe design context", () => {
+describe("safe local request handling", () => {
   test("keeps counts and drops arbitrary design data", () => {
     expect(
       sanitizeDesignSummary({
@@ -98,6 +133,31 @@ describe("safe design context", () => {
     });
   });
 
+  test("accepts bounded chat messages ending with the user", () => {
+    expect(
+      sanitizeMessages([
+        { role: "user", content: "  Create auto-scan  " },
+        { role: "assistant", content: "Which labels?" },
+        { role: "user", content: "Yes and No" },
+      ]),
+    ).toEqual([
+      { role: "user", content: "Create auto-scan" },
+      { role: "assistant", content: "Which labels?" },
+      { role: "user", content: "Yes and No" },
+    ]);
+  });
+
+  test("extracts only a non-empty Bearer token", () => {
+    expect(
+      extractBearerToken({
+        headers: { authorization: "Bearer sk-memory-only" },
+      }),
+    ).toBe("sk-memory-only");
+    expect(() =>
+      extractBearerToken({ headers: { authorization: "Basic secret" } }),
+    ).toThrow("Bearer");
+  });
+
   test("accepts loopback requests and rejects a spoofed remote Host header", () => {
     expect(
       isLocalRequest({
@@ -112,17 +172,32 @@ describe("safe design context", () => {
       }),
     ).toBe(false);
   });
+
+  test("sends the pasted key only in the Authorization header", async () => {
+    const fetchImpl = vi.fn(async (_url, request) => {
+      expect(request.headers.Authorization).toBe("Bearer sk-memory-only");
+      expect(request.body).not.toContain("sk-memory-only");
+      expect(JSON.parse(request.body)).toEqual({
+        messages: USER_MESSAGES,
+      });
+      return {
+        ok: true,
+        json: async () => serverResponse(),
+      };
+    });
+
+    await requestAuthoringConversation(USER_MESSAGES, {
+      apiKey: "sk-memory-only",
+      fetchImpl,
+    });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
 });
 
-describe("untrusted planner responses", () => {
+describe("untrusted planner response envelopes", () => {
   test.each([
     ["unknown operation", { ...VALID_PLAN, operation: "write_osdpi" }],
-    [
-      "missing selectKey",
-      Object.fromEntries(
-        Object.entries(VALID_PLAN).filter(([key]) => key != "selectKey"),
-      ),
-    ],
+    ["same start and select key", { ...VALID_PLAN, startKey: "Enter" }],
     ["invalid interval", { ...VALID_PLAN, intervalSeconds: 0 }],
     ["too few labels", { ...VALID_PLAN, buttonLabels: ["Only"] }],
     [
@@ -134,29 +209,60 @@ describe("untrusted planner responses", () => {
       },
     ],
   ])("rejects %s", (_name, plan) => {
-    expect(() => validateProviderResponse(serverResponse(plan))).toThrow(
+    expect(() => validateProviderResponse(serverResponse({ plan }))).toThrow(
       AuthoringPlanValidationError,
     );
   });
 
-  test("rejects an unknown provider", () => {
+  test.each(["clarification", "unsupported"])(
+    "accepts a %s response without a plan",
+    (kind) => {
+      expect(
+        validateProviderResponse(
+          serverResponse({
+            kind,
+            message: `${kind} message`,
+            plan: null,
+          }),
+        ),
+      ).toMatchObject({ kind, plan: null });
+    },
+  );
+
+  test("rejects a clarification response containing a plan", () => {
+    expect(() =>
+      validateProviderResponse(
+        serverResponse({
+          kind: "clarification",
+        }),
+      ),
+    ).toThrow(AuthoringProviderResponseError);
+  });
+
+  test("rejects unknown response fields", () => {
     expect(() =>
       validateProviderResponse({
         ...serverResponse(),
-        provider: "browser",
+        osdpi: { className: "Layout" },
       }),
     ).toThrow(AuthoringProviderResponseError);
   });
 });
 
 describe("OpenAI provider", () => {
-  test("uses Responses structured output and validates the returned plan", async () => {
+  test("uses a constrained conversation and structured response schema", async () => {
     const fetchImpl = vi.fn(async (_url, request) => {
       const body = JSON.parse(request.body);
       expect(body.text.format.type).toBe("json_schema");
       expect(body.text.format.strict).toBe(true);
       expect(body.text.format.schema.additionalProperties).toBe(false);
-      expect(body.input).toContain(PROMPT);
+      expect(body.instructions).toContain(
+        'default startKey to "Space", selectKey to "Enter"',
+      );
+      expect(body.instructions).toContain(
+        "never implies that Enter should start scanning",
+      );
+      expect(body.input).toEqual(USER_MESSAGES);
       return {
         ok: true,
         json: async () => openAIResponse(),
@@ -168,25 +274,75 @@ describe("OpenAI provider", () => {
       fetchImpl,
     });
     await expect(
-      provider.createPlan({
-        prompt: PROMPT,
+      provider.createResponse({
+        messages: USER_MESSAGES,
         designSummary: { pageCount: 1, buttonCount: 0, methodCount: 1 },
       }),
     ).resolves.toEqual(serverResponse());
     expect(fetchImpl).toHaveBeenCalledOnce();
   });
 
-  test("rejects invalid structured model output", () => {
+  test("fills only omitted planner defaults", () => {
+    expect(
+      normalizeOpenAIPlan({
+        operation: "configure_auto_scan",
+        restartAfterSelection: true,
+        buttonLabels: ["Yes", "No"],
+      }),
+    ).toEqual({
+      operation: "configure_auto_scan",
+      startKey: "Space",
+      selectKey: "Enter",
+      intervalSeconds: 0.6,
+      restartAfterSelection: true,
+      buttonLabels: ["Yes", "No"],
+    });
+
+    expect(normalizeOpenAIPlan(VALID_PLAN)).toEqual(VALID_PLAN);
+  });
+
+  test("normalizes nullable model defaults before validation", () => {
+    expect(
+      extractOpenAIResponse(
+        openAIResponse({
+          plan: {
+            ...VALID_PLAN,
+            startKey: null,
+            selectKey: null,
+            intervalSeconds: null,
+          },
+        }),
+      ).plan,
+    ).toEqual(VALID_PLAN);
+  });
+
+  test("rejects an invalid Enter/Enter model plan", () => {
     expect(() =>
-      extractOpenAIPlan(
-        openAIResponse({ ...VALID_PLAN, operation: "write_osdpi" }),
+      extractOpenAIResponse(
+        openAIResponse({
+          plan: { ...VALID_PLAN, startKey: "Enter" },
+        }),
       ),
     ).toThrow(AuthoringPlanValidationError);
   });
 
-  test("maps a model refusal to unsupported", () => {
-    expect(() =>
-      extractOpenAIPlan({
+  test("preserves clarification and unsupported responses", () => {
+    expect(
+      extractOpenAIResponse(
+        openAIResponse({
+          kind: "clarification",
+          message: "Which button labels should I use?",
+          plan: null,
+        }),
+      ),
+    ).toEqual({
+      kind: "clarification",
+      message: "Which button labels should I use?",
+      plan: null,
+    });
+
+    expect(
+      extractOpenAIResponse({
         status: "completed",
         output: [
           {
@@ -195,6 +351,10 @@ describe("OpenAI provider", () => {
           },
         ],
       }),
-    ).toThrow(UnsupportedAuthoringRequestError);
+    ).toEqual({
+      kind: "unsupported",
+      message: "Unsupported request: Unsupported scope",
+      plan: null,
+    });
   });
 });

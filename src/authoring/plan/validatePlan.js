@@ -1,5 +1,20 @@
 import { AUTO_SCAN_PLAN_KEYS } from "./schema";
 
+const KEY_ALIASES = {
+  " ": "space",
+  spacebar: "space",
+  return: "enter",
+  esc: "escape",
+};
+
+/** Normalize friendly key names for validation comparisons.
+ * @param {string} key
+ */
+export function normalizeKeyName(key) {
+  const normalized = key.trim().toLowerCase();
+  return KEY_ALIASES[normalized] || normalized;
+}
+
 export class AuthoringPlanValidationError extends Error {
   /** @param {string[]} errors */
   constructor(errors) {
@@ -34,6 +49,15 @@ export function validatePlan(plan) {
   }
   if (typeof plan.selectKey != "string" || !plan.selectKey.trim()) {
     errors.push("selectKey must be a non-empty string");
+  }
+  if (
+    typeof plan.startKey == "string" &&
+    plan.startKey.trim() &&
+    typeof plan.selectKey == "string" &&
+    plan.selectKey.trim() &&
+    normalizeKeyName(plan.startKey) == normalizeKeyName(plan.selectKey)
+  ) {
+    errors.push("startKey and selectKey must be different keys");
   }
   if (
     typeof plan.intervalSeconds != "number" ||
