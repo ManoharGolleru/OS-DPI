@@ -16,6 +16,7 @@ import "components/page";
 import "components/stack";
 import "components/button";
 import "components/display";
+import "components/speech";
 import "components/access/method/responses";
 import "components/access/method/keyHandler";
 import "components/access/method/pointerHandler";
@@ -25,7 +26,12 @@ import {
   configureAutoScan,
 } from "./commands/configureAutoScan";
 import {
+  SGD_NAMES,
+  createSgdInterface,
+} from "./commands/createSgdInterface";
+import {
   parseMockPrompt,
+  SGD_MVP_PLAN,
   UnsupportedAuthoringRequestError,
 } from "./plan/parseMockPrompt";
 import { validatePlan } from "./plan/validatePlan";
@@ -83,6 +89,10 @@ function makeDesign() {
   return Globals;
 }
 
+function walkTree(root) {
+  return [root, ...root.children.flatMap(walkTree)];
+}
+
 beforeEach(() => {
   document.body.innerHTML = '<div id="UI"></div><div id="designer"></div>';
 });
@@ -109,12 +119,20 @@ describe("mock prompt adapter", () => {
       UnsupportedAuthoringRequestError,
     );
   });
+
+  test("maps the QWERTY/Core vocabulary request to create_sgd_interface", () => {
+    expect(
+      parseMockPrompt(
+        "I want a complex SGD interface with qwerty keyboard and also some Core vocabulary. The user should be able to see what they are composing via display and be able to delete or clear things.",
+      ),
+    ).toEqual(SGD_MVP_PLAN);
+  });
 });
 
 describe("plan validation", () => {
-  test("reports invalid operation, keys, interval, and labels", () => {
+  test("reports invalid auto-scan keys, interval, and labels", () => {
     const result = validatePlan({
-      operation: "other",
+      operation: "configure_auto_scan",
       startKey: "",
       selectKey: 4,
       intervalSeconds: 0,
@@ -122,7 +140,17 @@ describe("plan validation", () => {
       buttonLabels: ["Yes", ""],
     });
     expect(result.valid).toBe(false);
-    expect(result.errors).toHaveLength(5);
+    expect(result.errors).toHaveLength(4);
+  });
+
+  test("rejects unsupported operations", () => {
+    const result = validatePlan({
+      operation: "other",
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "operation must be configure_auto_scan or create_sgd_interface",
+    );
   });
 
   test.each([
@@ -158,6 +186,34 @@ describe("plan validation", () => {
         children: [],
       }).valid,
     ).toBe(false);
+  });
+
+  test("accepts a valid SGD plan and rejects unsafe SGD variants", () => {
+    expect(validatePlan(SGD_MVP_PLAN)).toEqual({ valid: true, errors: [] });
+    expect(
+      validatePlan({
+        ...SGD_MVP_PLAN,
+        css: ".button { color: red }",
+      }).errors,
+    ).toContain("unsupported plan fields: css");
+    expect(
+      validatePlan({
+        ...SGD_MVP_PLAN,
+        keyboard: {
+          ...SGD_MVP_PLAN.keyboard,
+          className: "Grid",
+        },
+      }).errors,
+    ).toContain("keyboard contains unsupported fields: className");
+    expect(
+      validatePlan({
+        ...SGD_MVP_PLAN,
+        actions: {
+          ...SGD_MVP_PLAN.actions,
+          arbitraryExpression: "$Message = evil()",
+        },
+      }).errors,
+    ).toContain("actions contains unsupported fields: arbitraryExpression");
   });
 });
 
@@ -234,5 +290,131 @@ describe("configureAutoScan", () => {
       ),
     ).toHaveLength(2);
     expect(validateAutoScanDesign(design, plan).valid).toBe(true);
+  });
+});
+
+describe("createSgdInterface", () => {
+  test("creates visible display, QWERTY keys, vocabulary, controls, and speech", async () => {
+    const design = makeDesign();
+    await createSgdInterface(SGD_MVP_PLAN, design, { persist: false });
+
+    const nodes = walkTree(design.layout);
+    expect(
+      nodes.find(
+        (node) =>
+          node.className == "Button" &&
+          node.props["name"]?.value == SGD_NAMES.title,
+      )?.props["label"]?.value,
+    ).toBe("Generated SGD Interface");
+    expect(
+      nodes.find(
+        (node) =>
+          node.className == "Display" &&
+          node.props["Name"]?.value == SGD_NAMES.display,
+      )?.props["stateName"]?.value,
+    ).toBe("$Message");
+    expect(
+      nodes.filter(
+        (node) =>
+          node.className == "Button" &&
+          node.props["name"]?.value == SGD_NAMES.letterButton,
+      ),
+    ).toHaveLength(26);
+    expect(
+      nodes.filter(
+        (node) =>
+          node.className == "Button" &&
+          node.props["name"]?.value == SGD_NAMES.coreButton,
+      ),
+    ).toHaveLength(10);
+    for (const name of [
+      SGD_NAMES.deleteButton,
+      SGD_NAMES.clearButton,
+      SGD_NAMES.speakButton,
+    ]) {
+      expect(
+        nodes.some(
+          (node) =>
+            node.className == "Button" && node.props["name"]?.value == name,
+        ),
+      ).toBe(true);
+    }
+    expect(
+      nodes.some(
+        (node) =>
+          node.className == "Speech" &&
+          node.props["stateName"]?.value == SGD_NAMES.speechState,
+      ),
+    ).toBe(true);
+  });
+
+  test("uses fixed action templates for composing, delete, clear, and speak", async () => {
+    const design = makeDesign();
+    await createSgdInterface(SGD_MVP_PLAN, design, { persist: false });
+
+    design.actions.applyRules(SGD_NAMES.letterButton, "press", { label: "a" });
+    expect(design.state.get("$Message")).toBe("a");
+    design.actions.applyRules(SGD_NAMES.coreButton, "press", { label: "go" });
+    expect(design.state.get("$Message")).toBe("ago ");
+    design.actions.applyRules(SGD_NAMES.deleteButton, "press", {});
+    expect(design.state.get("$Message")).toBe("ago");
+    design.actions.applyRules(SGD_NAMES.clearButton, "press", {});
+    expect(design.state.get("$Message")).toBe("");
+    design.state.update({ $Message: "hello" });
+    design.actions.applyRules(SGD_NAMES.speakButton, "press", {});
+    expect(design.state.get(SGD_NAMES.speechState)).toBe("hello");
+  });
+
+  test("is idempotent and does not duplicate generated nodes", async () => {
+    const design = makeDesign();
+    await createSgdInterface(SGD_MVP_PLAN, design, { persist: false });
+    await createSgdInterface(SGD_MVP_PLAN, design, { persist: false });
+
+    const nodes = walkTree(design.layout);
+    expect(
+      nodes.filter(
+        (node) =>
+          node.className == "Display" &&
+          node.props["Name"]?.value == SGD_NAMES.display,
+      ),
+    ).toHaveLength(1);
+    expect(
+      nodes.filter(
+        (node) =>
+          node.className == "Button" &&
+          node.props["name"]?.value == SGD_NAMES.letterButton,
+      ),
+    ).toHaveLength(26);
+    expect(
+      design.actions.children.filter((child) =>
+        [
+          SGD_NAMES.letterButton,
+          SGD_NAMES.coreButton,
+          SGD_NAMES.spaceButton,
+          SGD_NAMES.deleteButton,
+          SGD_NAMES.clearButton,
+          SGD_NAMES.speakButton,
+        ].includes(child.props["origin"]?.value),
+      ),
+    ).toHaveLength(6);
+  });
+
+  test("does not break configureAutoScan when both commands are used", async () => {
+    const design = makeDesign();
+    await createSgdInterface(SGD_MVP_PLAN, design, { persist: false });
+    const scanPlan = parseMockPrompt(PROMPT);
+    await configureAutoScan(scanPlan, design, { persist: false });
+
+    expect(validateAutoScanDesign(design, scanPlan)).toEqual({
+      valid: true,
+      errors: [],
+    });
+    expect(
+      walkTree(design.layout).filter(
+        (node) =>
+          node.className == "Button" &&
+          node.props["name"]?.value == SGD_NAMES.letterButton,
+      ),
+    ).toHaveLength(26);
   });
 });

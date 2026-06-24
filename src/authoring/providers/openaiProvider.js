@@ -3,15 +3,19 @@ import { assertValidPlan } from "../plan/validatePlan";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 
-const PLANNER_INSTRUCTIONS = `You are the OS-DPI authoring planner.
-Hold a constrained conversation that can only produce a configure_auto_scan plan.
-Ask a short clarification question when required information such as button labels is genuinely missing.
-Never output OS-DPI JSON, component trees, patches, code, or a new operation.
-The only supported operation is configure_auto_scan.
-If the request is outside auto-scan authoring, return unsupported.
-For a plan, default startKey to "Space", selectKey to "Enter", and intervalSeconds to 0.6.
+export const PLANNER_INSTRUCTIONS = `You are the OS-DPI authoring planner.
+Hold a constrained conversation that can only produce one of two validated edit plans:
+1. configure_auto_scan
+2. create_sgd_interface
+Never output OS-DPI JSON, component trees, patches, code, CSS, class names, JavaScript, HTML, or an unapproved operation.
+For scanning requests, return configure_auto_scan. Default startKey to "Space", selectKey to "Enter", and intervalSeconds to 0.6.
 Enter selecting the current button never implies that Enter should start scanning.
-The start and selection keys must be different.
+The auto-scan start and selection keys must be different.
+For requests about SGD, AAC, QWERTY keyboards, core vocabulary, composing a message, a message display, delete, clear, or speech output, return create_sgd_interface.
+For create_sgd_interface, use title "Generated SGD Interface", displayState "$Message", keyboard.type "qwerty", includeSpace/includeDelete/includeClear true, 1 to 40 coreVocabulary strings, and boolean action intents only.
+Do not invent arbitrary actions; use only the approved action booleans in the schema.
+Ask a short clarification question only when genuinely necessary.
+If the request is outside these two authoring operations, return unsupported.
 Return only the supplied structured response schema.`;
 
 const OPENAI_RESPONSE_KEYS = ["kind", "message", "plan"];
@@ -21,11 +25,54 @@ const OPENAI_RESPONSE_KEYS = ["kind", "message", "plan"];
  */
 export function normalizeOpenAIPlan(plan) {
   if (!plan || typeof plan != "object" || Array.isArray(plan)) return plan;
+  if (plan.operation != "configure_auto_scan") return plan;
   return {
     ...plan,
     startKey: plan.startKey ?? "Space",
     selectKey: plan.selectKey ?? "Enter",
     intervalSeconds: plan.intervalSeconds ?? 0.6,
+  };
+}
+
+/** Validate and normalize the constrained planner envelope.
+ * @param {any} result
+ * @param {string} source
+ */
+export function normalizePlannerEnvelope(result, source = "Planner") {
+  if (!result || typeof result != "object" || Array.isArray(result)) {
+    throw new Error(`${source} response envelope must be an object`);
+  }
+  const unexpectedKeys = Object.keys(result).filter(
+    (key) => !OPENAI_RESPONSE_KEYS.includes(key),
+  );
+  if (unexpectedKeys.length) {
+    throw new Error(
+      `${source} response contained unsupported fields: ${unexpectedKeys.join(", ")}`,
+    );
+  }
+  if (!["clarification", "plan", "unsupported"].includes(result.kind)) {
+    throw new Error(`${source} response contained an unknown kind`);
+  }
+  if (typeof result.message != "string" || !result.message.trim()) {
+    throw new Error(`${source} response message must be a non-empty string`);
+  }
+
+  if (result.kind == "plan") {
+    const plan = normalizeOpenAIPlan(result.plan);
+    assertValidPlan(plan);
+    return {
+      kind: "plan",
+      message: result.message,
+      plan,
+    };
+  }
+  if (result.plan !== null) {
+    throw new Error(`${result.kind} responses must not contain a plan`);
+  }
+  return {
+    kind: result.kind,
+    message: result.message,
+    plan: null,
   };
 }
 
@@ -63,41 +110,7 @@ export function extractOpenAIResponse(response) {
     throw new Error("OpenAI response was not valid JSON");
   }
 
-  if (!result || typeof result != "object" || Array.isArray(result)) {
-    throw new Error("OpenAI response envelope must be an object");
-  }
-  const unexpectedKeys = Object.keys(result).filter(
-    (key) => !OPENAI_RESPONSE_KEYS.includes(key),
-  );
-  if (unexpectedKeys.length) {
-    throw new Error(
-      `OpenAI response contained unsupported fields: ${unexpectedKeys.join(", ")}`,
-    );
-  }
-  if (!["clarification", "plan", "unsupported"].includes(result.kind)) {
-    throw new Error("OpenAI response contained an unknown kind");
-  }
-  if (typeof result.message != "string" || !result.message.trim()) {
-    throw new Error("OpenAI response message must be a non-empty string");
-  }
-
-  if (result.kind == "plan") {
-    const plan = normalizeOpenAIPlan(result.plan);
-    assertValidPlan(plan);
-    return {
-      kind: "plan",
-      message: result.message,
-      plan,
-    };
-  }
-  if (result.plan !== null) {
-    throw new Error(`${result.kind} responses must not contain a plan`);
-  }
-  return {
-    kind: result.kind,
-    message: result.message,
-    plan: null,
-  };
+  return normalizePlannerEnvelope(result, "OpenAI");
 }
 
 /** Create the server-only OpenAI planner.

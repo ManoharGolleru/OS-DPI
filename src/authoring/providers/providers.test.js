@@ -10,6 +10,10 @@ import {
   extractOpenAIResponse,
   normalizeOpenAIPlan,
 } from "./openaiProvider";
+import {
+  createOpenRouterProvider,
+  extractOpenRouterResponse,
+} from "./openrouterProvider";
 import { selectAuthoringProvider } from "./index";
 import { AuthoringPlanValidationError } from "../plan/validatePlan";
 import {
@@ -21,6 +25,8 @@ import {
 
 const PROMPT =
   "Create an auto-scan interface where Enter selects the current button.";
+const SGD_PROMPT =
+  "I want a complex SGD interface with qwerty keyboard and also some Core vocabulary. The user should be able to see what they are composing via display and be able to delete or clear things.";
 
 const VALID_PLAN = {
   operation: "configure_auto_scan",
@@ -29,6 +35,37 @@ const VALID_PLAN = {
   intervalSeconds: 0.6,
   restartAfterSelection: true,
   buttonLabels: ["Yes", "No", "Help", "Stop"],
+};
+
+const VALID_SGD_PLAN = {
+  operation: "create_sgd_interface",
+  title: "Generated SGD Interface",
+  displayState: "$Message",
+  keyboard: {
+    type: "qwerty",
+    includeSpace: true,
+    includeDelete: true,
+    includeClear: true,
+  },
+  coreVocabulary: [
+    "I",
+    "you",
+    "want",
+    "go",
+    "more",
+    "help",
+    "yes",
+    "no",
+    "stop",
+    "finished",
+  ],
+  actions: {
+    lettersAppendToDisplay: true,
+    coreWordsAppendToDisplay: true,
+    deleteRemovesLastCharacter: true,
+    clearEmptiesDisplay: true,
+    speakUsesDisplay: true,
+  },
 };
 
 const USER_MESSAGES = [{ role: "user", content: PROMPT }];
@@ -66,6 +103,23 @@ function openAIResponse(result = {}) {
   };
 }
 
+function openRouterResponse(result = {}) {
+  return {
+    choices: [
+      {
+        message: {
+          content: JSON.stringify({
+            kind: "plan",
+            message: "Plan ready.",
+            plan: VALID_PLAN,
+            ...result,
+          }),
+        },
+      },
+    ],
+  };
+}
+
 describe("mock provider", () => {
   test("returns the known valid plan envelope", async () => {
     await expect(
@@ -90,6 +144,18 @@ describe("mock provider", () => {
       provider: "mock",
     });
   });
+
+  test("maps the QWERTY SGD request to create_sgd_interface", async () => {
+    await expect(
+      createMockProvider().createResponse({
+        messages: [{ role: "user", content: SGD_PROMPT }],
+      }),
+    ).resolves.toMatchObject({
+      kind: "plan",
+      plan: VALID_SGD_PLAN,
+      provider: "mock",
+    });
+  });
 });
 
 describe("provider selection", () => {
@@ -106,6 +172,15 @@ describe("provider selection", () => {
     expect(result.warnings[0]).toContain("OPENAI_API_KEY");
   });
 
+  test("explicit OpenRouter mode without a key falls back with a warning", async () => {
+    const provider = selectAuthoringProvider({
+      AUTHORING_PROVIDER: "openrouter",
+    });
+    const result = await provider.createResponse({ messages: USER_MESSAGES });
+    expect(result.provider).toBe("mock");
+    expect(result.warnings[0]).toContain("OPENROUTER_API_KEY");
+  });
+
   test("a pasted key takes precedence over mock environment configuration", () => {
     expect(
       selectAuthoringProvider(
@@ -113,6 +188,24 @@ describe("provider selection", () => {
         { apiKey: "sk-memory-only", fetchImpl: vi.fn() },
       ).name,
     ).toBe("openai");
+  });
+
+  test("OpenRouter selection uses OpenRouter env and pasted keys", () => {
+    expect(
+      selectAuthoringProvider(
+        {
+          AUTHORING_PROVIDER: "openrouter",
+          OPENROUTER_API_KEY: "or-env",
+        },
+        { fetchImpl: vi.fn() },
+      ).name,
+    ).toBe("openrouter");
+    expect(
+      selectAuthoringProvider(
+        { AUTHORING_PROVIDER: "openrouter" },
+        { apiKey: "or-memory-only", fetchImpl: vi.fn() },
+      ).name,
+    ).toBe("openrouter");
   });
 });
 
@@ -208,10 +301,25 @@ describe("untrusted planner response envelopes", () => {
         children: [{ className: "Page", props: {}, children: [] }],
       },
     ],
+    ["unknown operation", { ...VALID_SGD_PLAN, operation: "make_anything" }],
   ])("rejects %s", (_name, plan) => {
     expect(() => validateProviderResponse(serverResponse({ plan }))).toThrow(
       AuthoringPlanValidationError,
     );
+  });
+
+  test("accepts an OpenRouter plan response envelope", () => {
+    expect(
+      validateProviderResponse(
+        serverResponse({
+          provider: "openrouter",
+          plan: VALID_SGD_PLAN,
+        }),
+      ),
+    ).toMatchObject({
+      provider: "openrouter",
+      plan: VALID_SGD_PLAN,
+    });
   });
 
   test.each(["clarification", "unsupported"])(
@@ -257,11 +365,12 @@ describe("OpenAI provider", () => {
       expect(body.text.format.strict).toBe(true);
       expect(body.text.format.schema.additionalProperties).toBe(false);
       expect(body.instructions).toContain(
-        'default startKey to "Space", selectKey to "Enter"',
+        'Default startKey to "Space", selectKey to "Enter"',
       );
       expect(body.instructions).toContain(
         "never implies that Enter should start scanning",
       );
+      expect(body.instructions).toContain("create_sgd_interface");
       expect(body.input).toEqual(USER_MESSAGES);
       return {
         ok: true,
@@ -280,6 +389,16 @@ describe("OpenAI provider", () => {
       }),
     ).resolves.toEqual(serverResponse());
     expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  test("extracts a valid SGD response", () => {
+    expect(
+      extractOpenAIResponse(
+        openAIResponse({
+          plan: VALID_SGD_PLAN,
+        }),
+      ).plan,
+    ).toEqual(VALID_SGD_PLAN);
   });
 
   test("fills only omitted planner defaults", () => {
@@ -356,5 +475,84 @@ describe("OpenAI provider", () => {
       message: "Unsupported request: Unsupported scope",
       plan: null,
     });
+  });
+});
+
+describe("OpenRouter provider", () => {
+  test("uses server-side Bearer auth, app headers, and structured outputs", async () => {
+    const fetchImpl = vi.fn(async (url, request) => {
+      expect(url).toBe("https://openrouter.test/api/v1/chat/completions");
+      expect(request.headers.Authorization).toBe("Bearer or-test-key");
+      expect(request.headers["HTTP-Referer"]).toBe("http://127.0.0.1:8080");
+      expect(request.headers["X-OpenRouter-Title"]).toBe(
+        "OS-DPI Authoring Dev",
+      );
+      expect(request.body).not.toContain("or-test-key");
+      const body = JSON.parse(request.body);
+      expect(body.model).toBe("openrouter/free");
+      expect(body.response_format.type).toBe("json_schema");
+      expect(body.response_format.json_schema.strict).toBe(true);
+      expect(body.provider.require_parameters).toBe(true);
+      expect(body.messages[0].role).toBe("system");
+      expect(body.messages[0].content).toContain("create_sgd_interface");
+      return {
+        ok: true,
+        json: async () => openRouterResponse({ plan: VALID_SGD_PLAN }),
+      };
+    });
+
+    const provider = createOpenRouterProvider({
+      apiKey: "or-test-key",
+      baseUrl: "https://openrouter.test/api/v1",
+      fetchImpl,
+    });
+    await expect(
+      provider.createResponse({ messages: [{ role: "user", content: SGD_PROMPT }] }),
+    ).resolves.toEqual({
+      kind: "plan",
+      message: "Plan ready.",
+      plan: VALID_SGD_PLAN,
+      provider: "openrouter",
+      warnings: [],
+    });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  test("falls back to strict JSON when structured outputs are unsupported", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({
+          error: { message: "response_format json_schema unsupported" },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => openRouterResponse(),
+      });
+
+    const provider = createOpenRouterProvider({
+      apiKey: "or-test-key",
+      fetchImpl,
+    });
+    const result = await provider.createResponse({ messages: USER_MESSAGES });
+    expect(result.provider).toBe("openrouter");
+    expect(result.warnings[0]).toContain("strict JSON fallback");
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetchImpl.mock.calls[1][1].body).response_format).toBe(
+      undefined,
+    );
+  });
+
+  test("rejects invalid OpenRouter plans before they can be applied", () => {
+    expect(() =>
+      extractOpenRouterResponse(
+        openRouterResponse({
+          plan: { ...VALID_PLAN, operation: "raw_osdpi" },
+        }),
+      ),
+    ).toThrow(AuthoringPlanValidationError);
   });
 });

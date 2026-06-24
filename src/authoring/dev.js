@@ -1,6 +1,7 @@
 import Globals from "app/globals";
 import "./dev.css";
 import { configureAutoScan } from "./commands/configureAutoScan";
+import { createSgdInterface } from "./commands/createSgdInterface";
 import { parseMockPrompt } from "./plan/parseMockPrompt";
 import { validatePlan } from "./plan/validatePlan";
 import {
@@ -36,6 +37,14 @@ async function applyPlan(plan) {
   const planValidation = validatePlan(plan);
   if (!planValidation.valid) {
     throw new Error(planValidation.errors.join("; "));
+  }
+  if (plan.operation == "create_sgd_interface") {
+    const result = await createSgdInterface(plan);
+    return {
+      plan,
+      result,
+      validation: { valid: true, errors: [] },
+    };
   }
   const result = await configureAutoScan(plan);
   const validation = validateAutoScanDesign(Globals, plan);
@@ -144,14 +153,14 @@ function installLLMMode() {
 
   const apiLabel = document.createElement("label");
   apiLabel.htmlFor = "authoringApiKey";
-  apiLabel.textContent = "OpenAI API key (optional)";
+  apiLabel.textContent = "Planner API key (optional)";
 
   const apiKey = document.createElement("input");
   apiKey.id = "authoringApiKey";
   apiKey.type = "password";
   apiKey.autocomplete = "off";
   apiKey.spellcheck = false;
-  apiKey.placeholder = "Uses server configuration when blank";
+  apiKey.placeholder = "Uses server OpenAI/OpenRouter config when blank";
 
   const keyNote = document.createElement("p");
   keyNote.className = "authoring-dev-note";
@@ -169,7 +178,7 @@ function installLLMMode() {
   appendChatMessage(
     transcript,
     "assistant",
-    "Describe the auto-scan interface you want. I can clarify the request and prepare one validated plan.",
+    "Describe an auto-scan interface or a basic QWERTY/Core vocabulary SGD interface. I can clarify the request and prepare one validated plan.",
   );
 
   const promptLabel = document.createElement("label");
@@ -212,7 +221,19 @@ function installLLMMode() {
   validation.dataset.status = "idle";
   validation.setAttribute("aria-live", "polite");
   validation.textContent = "No plan generated";
-  details.append(providerLabel, provider, validationLabel, validation);
+  const operationLabel = document.createElement("dt");
+  operationLabel.textContent = "Operation";
+  const operation = document.createElement("dd");
+  operation.id = "authoringOperation";
+  operation.textContent = "Not selected";
+  details.append(
+    providerLabel,
+    provider,
+    operationLabel,
+    operation,
+    validationLabel,
+    validation,
+  );
 
   const messagesLabel = document.createElement("h3");
   messagesLabel.textContent = "Warnings and errors";
@@ -232,6 +253,7 @@ function installLLMMode() {
     pendingPlan = null;
     plannerResult = null;
     apply.disabled = true;
+    operation.textContent = "Not selected";
     preview.textContent = message;
   }
 
@@ -277,6 +299,7 @@ function installLLMMode() {
         }
         pendingPlan = plannerResult.plan;
         apply.disabled = false;
+        operation.textContent = pendingPlan.operation;
         validation.dataset.status = "ready";
         validation.textContent = "Valid plan ready";
         preview.textContent = JSON.stringify(pendingPlan, null, 2);

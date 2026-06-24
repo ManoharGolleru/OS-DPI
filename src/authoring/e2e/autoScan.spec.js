@@ -9,6 +9,37 @@ const VALID_PLAN = {
   buttonLabels: ["Yes", "No", "Help", "Stop"],
 };
 
+const VALID_SGD_PLAN = {
+  operation: "create_sgd_interface",
+  title: "Generated SGD Interface",
+  displayState: "$Message",
+  keyboard: {
+    type: "qwerty",
+    includeSpace: true,
+    includeDelete: true,
+    includeClear: true,
+  },
+  coreVocabulary: [
+    "I",
+    "you",
+    "want",
+    "go",
+    "more",
+    "help",
+    "yes",
+    "no",
+    "stop",
+    "finished",
+  ],
+  actions: {
+    lettersAppendToDisplay: true,
+    coreWordsAppendToDisplay: true,
+    deleteRemovesLastCharacter: true,
+    clearEmptiesDisplay: true,
+    speakUsesDisplay: true,
+  },
+};
+
 function collectConsoleErrors(page) {
   const errors = [];
   page.on("console", (message) => {
@@ -135,6 +166,7 @@ test("LLM panel supports clarification, review, and explicit apply", async ({
   await expect(generate).toBeVisible();
   await expect(apply).toBeVisible();
   await expect(page.locator("#authoringProvider")).toBeVisible();
+  await expect(page.locator("#authoringOperation")).toBeVisible();
   await expect(status).toBeVisible();
   await expect(page.locator("#authoringMessages")).toBeVisible();
   await expect(page.locator("#authoringPlanPreview")).toBeVisible();
@@ -161,6 +193,9 @@ test("LLM panel supports clarification, review, and explicit apply", async ({
   );
   await expect(page.locator("#authoringPlanPreview")).toContainText(
     '"startKey": "Space"',
+  );
+  await expect(page.locator("#authoringOperation")).toHaveText(
+    "configure_auto_scan",
   );
   await expect(apply).toBeEnabled();
   expect(capturedRequests[1].authorization).toBe(
@@ -194,6 +229,92 @@ test("LLM panel supports clarification, review, and explicit apply", async ({
   await expect(page.locator("#UI button[cue]")).toHaveCount(1, {
     timeout: 1500,
   });
+  expect(consoleErrors).toEqual([]);
+});
+
+test("LLM panel can generate and apply a basic SGD interface", async ({
+  page,
+}) => {
+  const consoleErrors = collectConsoleErrors(page);
+
+  await page.route("**/api/authoring/plan", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        kind: "plan",
+        message: "The SGD plan is ready to review.",
+        plan: VALID_SGD_PLAN,
+        provider: "openrouter",
+        warnings: [],
+      }),
+    });
+  });
+
+  const designName = `authoring-sgd-e2e-${Date.now()}`;
+  await page.goto(`?authoring=llm#${designName}`);
+
+  const panel = page.locator("#authoringLLM");
+  const prompt = page.locator("#authoringPrompt");
+  const apply = page.locator("#authoringApply");
+  await expect(panel).toBeVisible();
+  await expect(apply).toBeDisabled();
+
+  await prompt.fill(
+    "I want a complex SGD interface with qwerty keyboard and also some Core vocabulary. The user should be able to see what they are composing via display and be able to delete or clear things.",
+  );
+  await page.locator("#authoringGenerate").click();
+  await expect(page.locator("#authoringStatus")).toHaveAttribute(
+    "data-status",
+    "ready",
+  );
+  await expect(page.locator("#authoringProvider")).toHaveText("openrouter");
+  await expect(page.locator("#authoringOperation")).toHaveText(
+    "create_sgd_interface",
+  );
+  await expect(page.locator("#authoringPlanPreview")).toContainText(
+    '"operation": "create_sgd_interface"',
+  );
+  await expect(apply).toBeEnabled();
+
+  await apply.click();
+  await expect(page.locator("#authoringStatus")).toHaveAttribute(
+    "data-status",
+    "complete",
+  );
+  await expect(page.locator("#UI")).toContainText("Generated SGD Interface");
+  const display = page.locator("#UI .display button");
+  await expect(display).toBeVisible();
+  await expect(
+    page.locator('#UI button.button[name="authoring-sgd-letter"]'),
+  ).toHaveCount(26);
+  await expect(
+    page.locator('#UI button.button[name="authoring-sgd-core-word"]'),
+  ).toHaveCount(10);
+  await expect(
+    page.locator('#UI button.button[name="authoring-sgd-delete"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('#UI button.button[name="authoring-sgd-clear"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('#UI button.button[name="authoring-sgd-speak"]'),
+  ).toBeVisible();
+
+  await page
+    .locator("#UI")
+    .getByRole("button", { name: "a", exact: true })
+    .click();
+  await expect(display).toHaveText("a");
+  await page
+    .locator("#UI")
+    .getByRole("button", { name: "go", exact: true })
+    .click();
+  await expect(display).toHaveText("ago");
+  await page.locator('#UI button.button[name="authoring-sgd-delete"]').click();
+  await expect(display).toHaveText("ago");
+  await page.locator('#UI button.button[name="authoring-sgd-clear"]').click();
+  await expect(display).toHaveText("");
   expect(consoleErrors).toEqual([]);
 });
 

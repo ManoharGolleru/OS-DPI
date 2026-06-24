@@ -42,7 +42,7 @@ export function validateProviderResponse(response) {
       "Authoring server message must be a non-empty string",
     );
   }
-  if (!["mock", "openai"].includes(response.provider)) {
+  if (!["mock", "openai", "openrouter"].includes(response.provider)) {
     throw new AuthoringProviderResponseError(
       "Authoring server returned an unknown provider",
     );
